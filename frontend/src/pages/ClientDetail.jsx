@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { ArrowLeft, Loader2, Save, Trash2 } from "lucide-react";
 import {
@@ -22,9 +22,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import MasterToggle from "@/components/MasterToggle";
+import MasterStatusHero from "@/components/MasterStatusHero";
 import EmbedCodeBlock from "@/components/EmbedCodeBlock";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+
+const hydrate = (data) => ({
+  ...data,
+  enabled_profiles: { ...DEFAULT_PROFILES, ...(data.enabled_profiles || {}) },
+  enabled_features: { ...DEFAULT_FEATURES, ...(data.enabled_features || {}) },
+});
 
 export default function ClientDetail() {
   const { id } = useParams();
@@ -35,7 +41,7 @@ export default function ClientDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
-    let active = true;
+    let alive = true;
     (async () => {
       setLoading(true);
       const { data, error } = await supabase
@@ -43,35 +49,40 @@ export default function ClientDetail() {
         .select("*")
         .eq("id", id)
         .maybeSingle();
-      if (!active) return;
+      if (!alive) return;
       if (error || !data) {
         toast.error("Client not found");
         navigate("/clients");
         return;
       }
-      setClient({
-        ...data,
-        enabled_profiles: { ...DEFAULT_PROFILES, ...(data.enabled_profiles || {}) },
-        enabled_features: { ...DEFAULT_FEATURES, ...(data.enabled_features || {}) },
-      });
+      setClient(hydrate(data));
       setLoading(false);
     })();
     return () => {
-      active = false;
+      alive = false;
     };
   }, [id, navigate]);
 
-  const update = (patch) => setClient((c) => ({ ...c, ...patch }));
-  const updateProfile = (key, val) =>
-    setClient((c) => ({
-      ...c,
-      enabled_profiles: { ...c.enabled_profiles, [key]: val },
-    }));
-  const updateFeature = (key, val) =>
-    setClient((c) => ({
-      ...c,
-      enabled_features: { ...c.enabled_features, [key]: val },
-    }));
+  const update = useCallback(
+    (patch) => setClient((c) => ({ ...c, ...patch })),
+    []
+  );
+  const updateProfile = useCallback(
+    (key, val) =>
+      setClient((c) => ({
+        ...c,
+        enabled_profiles: { ...c.enabled_profiles, [key]: val },
+      })),
+    []
+  );
+  const updateFeature = useCallback(
+    (key, val) =>
+      setClient((c) => ({
+        ...c,
+        enabled_features: { ...c.enabled_features, [key]: val },
+      })),
+    []
+  );
 
   const embedCode = useMemo(
     () => generateEmbedCode(client?.domain),
@@ -107,11 +118,7 @@ export default function ClientDetail() {
       else toast.error(error.message || "Failed to save");
       return;
     }
-    setClient({
-      ...data,
-      enabled_profiles: { ...DEFAULT_PROFILES, ...(data.enabled_profiles || {}) },
-      enabled_features: { ...DEFAULT_FEATURES, ...(data.enabled_features || {}) },
-    });
+    setClient(hydrate(data));
     toast.success("Changes saved");
   };
 
@@ -170,44 +177,12 @@ export default function ClientDetail() {
       </div>
 
       {/* Master toggle hero */}
-      <div className="bg-[#1e2130] border border-[#2e3245] rounded-xl p-6 md:p-7 mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.22em] text-[#007bff] font-bold mb-2">
-              Widget Status
-            </div>
-            <h1
-              className="text-3xl md:text-4xl font-bold tracking-tight text-white"
-              style={{ fontFamily: "Outfit, sans-serif" }}
-            >
-              {client.name}
-            </h1>
-            <div className="mt-1.5 text-sm text-[#94a3b8] font-mono">{client.domain}</div>
-          </div>
-
-          <div className="flex items-center gap-5 bg-[#0f1117] border border-[#2e3245] rounded-xl px-5 py-4">
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-[#64748b] font-bold">
-                Master Switch
-              </div>
-              <div
-                data-testid="widget-status-label"
-                className={`text-lg font-bold tracking-tight ${
-                  client.active ? "text-[#10b981]" : "text-[#ef4444]"
-                }`}
-                style={{ fontFamily: "Outfit, sans-serif" }}
-              >
-                {client.active ? "Active" : "Inactive"}
-              </div>
-            </div>
-            <MasterToggle
-              active={client.active}
-              onChange={handleToggleActive}
-              testId="master-widget-toggle"
-            />
-          </div>
-        </div>
-      </div>
+      <MasterStatusHero
+        name={client.name}
+        domain={client.domain}
+        active={client.active}
+        onToggle={handleToggleActive}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column: details + toggles */}

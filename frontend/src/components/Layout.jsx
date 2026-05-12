@@ -2,6 +2,14 @@ import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import { Toaster } from "sonner";
 
+const TOAST_OPTIONS = {
+  style: {
+    background: "#1e2130",
+    border: "1px solid #2e3245",
+    color: "#f8fafc",
+  },
+};
+
 export default function Layout() {
   return (
     <div className="min-h-screen bg-[#0f1117] text-[#f8fafc]">
@@ -16,13 +24,7 @@ export default function Layout() {
         position="bottom-right"
         richColors
         closeButton
-        toastOptions={{
-          style: {
-            background: "#1e2130",
-            border: "1px solid #2e3245",
-            color: "#f8fafc",
-          },
-        }}
+        toastOptions={TOAST_OPTIONS}
       />
     </div>
   );

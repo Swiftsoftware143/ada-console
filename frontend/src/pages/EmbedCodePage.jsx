@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, Inbox, ExternalLink, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -14,16 +14,18 @@ export default function EmbedCodePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("clients")
-        .select("*")
-        .order("created_at", { ascending: false });
-      setClients(data || []);
-      setLoading(false);
-    })();
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from("clients")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setClients(data || []);
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

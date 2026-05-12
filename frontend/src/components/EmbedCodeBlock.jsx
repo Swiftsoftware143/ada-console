@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { toast } from "sonner";
 
+const COPY_FEEDBACK_MS = 1800;
+
 export default function EmbedCodeBlock({ code, testId = "embed-code-block" }) {
   const [copied, setCopied] = useState(false);
 
@@ -10,7 +12,7 @@ export default function EmbedCodeBlock({ code, testId = "embed-code-block" }) {
       await navigator.clipboard.writeText(code);
       setCopied(true);
       toast.success("Embed code copied to clipboard");
-      setTimeout(() => setCopied(false), 1800);
+      setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
     } catch {
       toast.error("Failed to copy code");
     }

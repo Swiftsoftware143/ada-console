@@ -35,3 +35,26 @@ export const isThisMonth = (iso) => {
     d.getUTCFullYear() === now.getUTCFullYear()
   );
 };
+
+export const sortByKey = (list, key, dir) => {
+  return [...list].sort((a, b) => {
+    const av = a[key];
+    const bv = b[key];
+    if (av === bv) return 0;
+    if (av === null || av === undefined) return 1;
+    if (bv === null || bv === undefined) return -1;
+    const cmp = av > bv ? 1 : -1;
+    return dir === "asc" ? cmp : -cmp;
+  });
+};
+
+export const filterClients = (list, query) => {
+  const q = query.trim().toLowerCase();
+  if (!q) return list;
+  return list.filter(
+    (c) =>
+      c.name?.toLowerCase().includes(q) ||
+      c.domain?.toLowerCase().includes(q) ||
+      c.plan_tier?.toLowerCase().includes(q)
+  );
+};

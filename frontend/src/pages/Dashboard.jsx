@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Users, CheckCircle2, XCircle, Sparkles, Plus, ArrowRight, Inbox } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -15,7 +15,7 @@ export default function Dashboard() {
   const [modalOpen, setModalOpen] = useState(false);
   const navigate = useNavigate();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("clients")
@@ -23,11 +23,11 @@ export default function Dashboard() {
       .order("created_at", { ascending: false });
     if (!error) setClients(data || []);
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const stats = useMemo(() => {
     const total = clients.length;

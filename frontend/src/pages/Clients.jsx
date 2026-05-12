@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -12,7 +12,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { formatDate } from "@/lib/helpers";
+import { formatDate, sortByKey, filterClients } from "@/lib/helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import StatusBadge from "@/components/StatusBadge";
@@ -39,7 +39,7 @@ export default function Clients() {
   const [toDelete, setToDelete] = useState(null);
   const navigate = useNavigate();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("clients")
@@ -48,11 +48,11 @@ export default function Clients() {
     if (error) toast.error(error.message);
     else setClients(data || []);
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const toggleActive = async (client, e) => {
     e.stopPropagation();
@@ -92,28 +92,10 @@ export default function Clients() {
     }
   };
 
-  const filteredSorted = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    let list = clients;
-    if (q) {
-      list = list.filter(
-        (c) =>
-          c.name?.toLowerCase().includes(q) ||
-          c.domain?.toLowerCase().includes(q) ||
-          c.plan_tier?.toLowerCase().includes(q)
-      );
-    }
-    list = [...list].sort((a, b) => {
-      const av = a[sortKey];
-      const bv = b[sortKey];
-      if (av === bv) return 0;
-      if (av === null || av === undefined) return 1;
-      if (bv === null || bv === undefined) return -1;
-      const cmp = av > bv ? 1 : -1;
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    return list;
-  }, [clients, search, sortKey, sortDir]);
+  const filteredSorted = useMemo(
+    () => sortByKey(filterClients(clients, search), sortKey, sortDir),
+    [clients, search, sortKey, sortDir]
+  );
 
   return (
     <div data-testid="clients-page">
