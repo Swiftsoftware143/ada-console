@@ -1,0 +1,55 @@
+{
+  "summary": "End-to-end frontend testing of SwiftImpact ADA Console (React + Supabase). Created/edited/deleted disposable TEST_ clients against live Supabase. All major flows verified: dashboard stats, recent table, sidebar nav, clients CRUD, search, sort, row actions (edit/toggle/delete), delete-confirm modal, client detail edit form, live embed snippet, master widget toggle, profile + feature toggles, save persistence after reload, embed code page with per-client copy buttons, domain auto-strip, and toast notifications. Seed client 'BV Premiere Products' was preserved.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Client Detail",
+        "issues": [
+          "Sonner toasts render top-right with high z-index over the sticky 'Save changes' button in the right column. When a toast is visible (e.g., right after toggling the master switch), clicking 'Save changes' can be intercepted by the toast overlay (real users would also see this). Recommend either moving the toaster position (e.g., bottom-right) or reducing toast width / adding pointer-events:none on the safe area, OR moving the Save button outside the toast's potential overlap zone."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Consider relocating sonner Toaster position (e.g., bottom-right) or shrinking toast width so it does not overlap the sticky 'Save changes' button on Client Detail page — minor UX issue only."
+  ],
+  "critical_code_review_comments": [
+    "ClientDetail.handleToggleActive does not refresh other local state from server (intentional but could drift if other tabs edit concurrently). Acceptable for current scope.",
+    "ClientFormModal hardcodes agency_name and cta_url ('SwiftImpact Solutions' / 'https://swiftimpactsolutions.com/ada'). Consider centralizing as constants.",
+    "EmbedCodePage and Dashboard both query supabase directly; consider a small useClients hook to DRY shared loading logic.",
+    "isThisMonth uses UTC month/year while created_at is rendered with locale date; harmless edge case at month boundaries near midnight UTC.",
+    "No optimistic-revert in toggleActive on Clients page on failure (only toast); state will diverge from DB until next reload."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100%"},
+  "test_credentials": "None required (Supabase anon key already configured in frontend/.env). No /app/memory/test_credentials.md present.",
+  "seed_data_creation": "Created disposable TEST_Client_<uuid> and TEST_Save_<uuid> rows in Supabase 'clients' table during tests; all rows were deleted via the UI's delete-confirm flow at end of each run. Seed row 'BV Premiere Products' (bvpremiereproducts.com) untouched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "App is a pure React + Supabase SPA (no FastAPI). Public URL: https://swiftada-manager.preview.emergentagent.com. data-testid coverage is excellent and reliable. Use unique UUID-based domains for write tests due to unique constraint on clients.domain. Always cleanup via UI delete to also verify the delete-confirm modal. Note the toast/save-button overlap on Client Detail — when scripting, dismiss toasts or wait long enough (>4s) before clicking save-changes-btn, otherwise force-clicks may be swallowed by the toast.",
+  "verified_flows": [
+    "Dashboard stat cards populated (stat-total-clients=1, active=1, inactive=0, new-this-month=1)",
+    "recent-clients-table renders seed row",
+    "dashboard-quick-add-btn opens add-client-modal and Cancel closes it",
+    "Sidebar nav-dashboard / nav-clients / nav-embed all route correctly",
+    "Clients page lists rows and shows clients-count",
+    "add-new-client-btn -> modal -> create TEST_Client with 'https://www.test-xxx.example.com/' -> stored cleanly as 'test-xxx.example.com' (cleanDomain working)",
+    "clients-search-input filters in realtime; clients-no-results shows for non-matching query",
+    "sort-name, sort-domain, sort-created_at toggle asc/desc",
+    "toggle-btn-{id} flips active state and shows toast",
+    "client-row-{id} click navigates to /clients/:id",
+    "Master widget toggle updates DB and label flips between green Active and red Inactive",
+    "field-domain change triggers live update of detail-embed-block (exact snippet format verified)",
+    "Profile toggles (5) and feature toggles (10) render and toggle correctly",
+    "save-changes-btn PATCH to Supabase returns 200; notes/profile/feature/domain persist across page reload",
+    "embed-code-page lists embed-card-{id} for each client with copy button (clipboard write attempted)",
+    "delete-btn-{id} opens delete-confirm-modal; delete-confirm-btn removes row from DB and UI"
+  ]
+}
