@@ -4,7 +4,7 @@
 ──────────────────────────────────────────────────────────────────────── */
 (function() {
   var CORRECT_URL = "https://adaswift.netlify.app/loader.js";
-  var LEGACY_DOMAINS = ["cdn.swiftimpactsolutions.com"];
+  var LEGACY_DOMAINS = ["cdn.swiftimpactsolutions.com", "adaswift.netlify.app"];
   var currentSrc = document.currentScript && document.currentScript.src;
   if (currentSrc) {
     var isLegacy = LEGACY_DOMAINS.some(function(d) { return currentSrc.indexOf(d) > -1; });
