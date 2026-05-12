@@ -1,9 +1,10 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Users, Code2, Zap, Settings } from "lucide-react";
+import { LayoutDashboard, Users, Code2, Zap, Settings, Globe } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, testId: "nav-dashboard" },
   { to: "/clients", label: "Clients", icon: Users, testId: "nav-clients" },
+  { to: "/personal-websites", label: "Personal Websites", icon: Globe, testId: "nav-personal-websites" },
   { to: "/embed", label: "Embed Code", icon: Code2, testId: "nav-embed" },
   { to: "/settings", label: "Settings", icon: Settings, testId: "nav-settings" },
 ];
