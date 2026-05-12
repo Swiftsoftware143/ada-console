@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabase";
+
 export const cleanDomain = (raw) => {
   if (!raw) return "";
   return raw
@@ -8,9 +10,52 @@ export const cleanDomain = (raw) => {
     .toLowerCase();
 };
 
-export const generateEmbedCode = (domain) => {
+// Cache for CDN domain to avoid repeated API calls
+let cachedCdnDomain = null;
+let cachedCdnDomainExpiry = null;
+const CACHE_DURATION_MS = 60000; // 1 minute cache
+
+export const getCdnDomain = async () => {
+  // Return cached value if still valid
+  if (cachedCdnDomain && cachedCdnDomainExpiry && Date.now() < cachedCdnDomainExpiry) {
+    return cachedCdnDomain;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "cdn_domain")
+      .maybeSingle();
+
+    if (error || !data) {
+      // Fallback to default if settings table doesn't exist or no value
+      cachedCdnDomain = "https://adaswift.netlify.app";
+    } else {
+      cachedCdnDomain = data.value;
+    }
+  } catch (e) {
+    // Fallback on any error
+    cachedCdnDomain = "https://adaswift.netlify.app";
+  }
+
+  cachedCdnDomainExpiry = Date.now() + CACHE_DURATION_MS;
+  return cachedCdnDomain;
+};
+
+// Synchronous version for components that can't use async (uses cached value)
+export const getCachedCdnDomain = () => {
+  return cachedCdnDomain || "https://adaswift.netlify.app";
+};
+
+// Preload the CDN domain on app init
+export const preloadCdnDomain = async () => {
+  await getCdnDomain();
+};
+
+export const generateEmbedCode = (domain, cdnDomain = "https://adaswift.netlify.app") => {
   const d = cleanDomain(domain) || "YOUR_DOMAIN_HERE";
-  return `<script>!function(){var s=document.createElement("script");s.src="https://cdn.swiftimpactsolutions.com/ada/loader.js";s.setAttribute("data-domain","${d}");s.async=!0;document.body.appendChild(s)}();</script>`;
+  return `<script>!function(){var s=document.createElement("script");s.src="${cdnDomain}/loader.js";s.setAttribute("data-domain","${d}");s.async=!0;document.body.appendChild(s)}();</script>`;
 };
 
 export const formatDate = (iso) => {
