@@ -30,7 +30,7 @@ const initialState = {
   notes: "",
 };
 
-export default function ClientFormModal({ open, onOpenChange, onCreated }) {
+export default function ClientFormModal({ open, onOpenChange, onCreated, isPersonal = false }) {
   const [form, setForm] = useState(initialState);
   const [saving, setSaving] = useState(false);
 
@@ -41,7 +41,7 @@ export default function ClientFormModal({ open, onOpenChange, onCreated }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) {
-      toast.error("Client name is required");
+      toast.error(isPersonal ? "Website name is required" : "Client name is required");
       return;
     }
     if (!form.domain.trim()) {
@@ -62,6 +62,7 @@ export default function ClientFormModal({ open, onOpenChange, onCreated }) {
       primary_color: "#007bff",
       enabled_profiles: DEFAULT_PROFILES,
       enabled_features: DEFAULT_FEATURES,
+      is_personal: isPersonal, // Flag to identify personal websites
     };
 
     const { data, error } = await supabase
@@ -74,9 +75,9 @@ export default function ClientFormModal({ open, onOpenChange, onCreated }) {
 
     if (error) {
       if (error.code === "23505") {
-        toast.error("A client with this domain already exists");
+        toast.error("A website with this domain already exists");
       } else {
-        toast.error(error.message || "Failed to create client");
+        toast.error(error.message || "Failed to create website");
       }
       return;
     }
@@ -94,24 +95,26 @@ export default function ClientFormModal({ open, onOpenChange, onCreated }) {
       >
         <DialogHeader>
           <DialogTitle className="text-xl tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
-            Add new client
+            {isPersonal ? "Add Personal Website" : "Add new client"}
           </DialogTitle>
           <DialogDescription className="text-[#94a3b8]">
-            Create a new client. You can configure widget defaults afterwards.
+            {isPersonal 
+              ? "Create an ADA widget for your personal website." 
+              : "Create a new client. You can configure widget defaults afterwards."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label htmlFor="client-name" className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
-              Client Name
+              {isPersonal ? "Website Name" : "Client Name"}
             </Label>
             <Input
               id="client-name"
               data-testid="add-client-name-input"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Acme Co"
+              placeholder={isPersonal ? "My Website" : "Acme Co"}
               className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
             />
           </div>
@@ -163,7 +166,7 @@ export default function ClientFormModal({ open, onOpenChange, onCreated }) {
               data-testid="add-client-notes-input"
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Optional notes for the agency..."
+              placeholder="Optional notes..."
               rows={3}
               className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent resize-none"
             />
@@ -191,7 +194,7 @@ export default function ClientFormModal({ open, onOpenChange, onCreated }) {
                   Creating
                 </>
               ) : (
-                "Create Client"
+                isPersonal ? "Create Website" : "Create Client"
               )}
             </Button>
           </DialogFooter>
