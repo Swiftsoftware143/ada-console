@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import StatusBadge from "@/components/StatusBadge";
 import PageHeader from "@/components/PageHeader";
-import ClientFormModal from "@/components/ClientFormModal";
+import PersonalWebsiteFormModal from "@/components/PersonalWebsiteFormModal";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import { toast } from "sonner";
 
@@ -233,7 +233,7 @@ export default function PersonalWebsites() {
         {renderTable()}
       </div>
 
-      <ClientFormModal isPersonal open={addOpen} onOpenChange={setAddOpen} onCreated={() => load()} />
+      <PersonalWebsiteFormModal open={addOpen} onOpenChange={setAddOpen} onCreated={() => load()} />
       <DeleteConfirmModal
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}
