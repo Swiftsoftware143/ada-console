@@ -42,7 +42,7 @@ export default function PersonalWebsites() {
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("clients")
+      .from("personal_websites")
       .select("*")
       .order("created_at", { ascending: false });
     if (error) toast.error(error.message);
@@ -58,7 +58,7 @@ export default function PersonalWebsites() {
     e.stopPropagation();
     const newVal = !website.active;
     const { error } = await supabase
-      .from("clients")
+      .from("personal_websites")
       .update({ active: newVal })
       .eq("id", website.id);
     if (error) {
@@ -73,7 +73,7 @@ export default function PersonalWebsites() {
 
   const handleDelete = async () => {
     if (!toDelete) return;
-    const { error } = await supabase.from("clients").delete().eq("id", toDelete.id);
+    const { error } = await supabase.from("personal_websites").delete().eq("id", toDelete.id);
     if (error) {
       toast.error("Failed to delete client");
       return;
