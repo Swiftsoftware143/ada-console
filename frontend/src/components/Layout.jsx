@@ -13,7 +13,7 @@ export default function Layout() {
       </main>
       <Toaster
         theme="dark"
-        position="top-right"
+        position="bottom-right"
         richColors
         closeButton
         toastOptions={{
