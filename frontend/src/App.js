@@ -17,9 +17,9 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/clients/:id" element={<ClientDetail />} />
+            <Route path="/personal-websites" element={<PersonalWebsites />} />
             <Route path="/embed" element={<EmbedCodePage />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/personal-websites" element={<PersonalWebsites />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
