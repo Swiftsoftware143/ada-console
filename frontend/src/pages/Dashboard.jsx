@@ -39,6 +39,52 @@ export default function Dashboard() {
 
   const recent = clients.slice(0, 5);
 
+  const renderRecent = () => {
+    if (loading) {
+      return <div className="p-10 text-center text-[#64748b] text-sm">Loading clients...</div>;
+    }
+    if (recent.length === 0) {
+      return <EmptyState onAdd={() => setModalOpen(true)} />;
+    }
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" data-testid="recent-clients-table">
+          <thead>
+            <tr className="text-left text-[10px] uppercase tracking-[0.15em] text-[#64748b] font-bold">
+              <th className="px-6 py-3 font-bold">Client</th>
+              <th className="px-6 py-3 font-bold">Domain</th>
+              <th className="px-6 py-3 font-bold">Plan</th>
+              <th className="px-6 py-3 font-bold">Status</th>
+              <th className="px-6 py-3 font-bold">Added</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recent.map((c) => (
+              <tr
+                key={c.id}
+                onClick={() => navigate(`/clients/${c.id}`)}
+                data-testid={`recent-client-row-${c.id}`}
+                className="border-t border-[#2e3245] hover:bg-[#1a1d27]/60 cursor-pointer transition-colors"
+              >
+                <td className="px-6 py-4 text-white font-medium">{c.name}</td>
+                <td className="px-6 py-4 text-[#94a3b8] font-mono text-xs">{c.domain}</td>
+                <td className="px-6 py-4">
+                  <span className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8]">
+                    {c.plan_tier}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  <StatusBadge active={c.active} testId={`recent-status-${c.id}`} />
+                </td>
+                <td className="px-6 py-4 text-[#94a3b8] text-xs">{formatDate(c.created_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   return (
     <div data-testid="dashboard-page">
       <PageHeader
@@ -108,47 +154,7 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        {loading ? (
-          <div className="p-10 text-center text-[#64748b] text-sm">Loading clients...</div>
-        ) : recent.length === 0 ? (
-          <EmptyState onAdd={() => setModalOpen(true)} />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm" data-testid="recent-clients-table">
-              <thead>
-                <tr className="text-left text-[10px] uppercase tracking-[0.15em] text-[#64748b] font-bold">
-                  <th className="px-6 py-3 font-bold">Client</th>
-                  <th className="px-6 py-3 font-bold">Domain</th>
-                  <th className="px-6 py-3 font-bold">Plan</th>
-                  <th className="px-6 py-3 font-bold">Status</th>
-                  <th className="px-6 py-3 font-bold">Added</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map((c) => (
-                  <tr
-                    key={c.id}
-                    onClick={() => navigate(`/clients/${c.id}`)}
-                    data-testid={`recent-client-row-${c.id}`}
-                    className="border-t border-[#2e3245] hover:bg-[#1a1d27]/60 cursor-pointer transition-colors"
-                  >
-                    <td className="px-6 py-4 text-white font-medium">{c.name}</td>
-                    <td className="px-6 py-4 text-[#94a3b8] font-mono text-xs">{c.domain}</td>
-                    <td className="px-6 py-4">
-                      <span className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8]">
-                        {c.plan_tier}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge active={c.active} testId={`recent-status-${c.id}`} />
-                    </td>
-                    <td className="px-6 py-4 text-[#94a3b8] text-xs">{formatDate(c.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {renderRecent()}
       </div>
 
       <ClientFormModal

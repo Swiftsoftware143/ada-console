@@ -97,6 +97,104 @@ export default function Clients() {
     [clients, search, sortKey, sortDir]
   );
 
+  const renderTable = () => {
+    if (loading) {
+      return <div className="p-10 text-center text-[#64748b] text-sm">Loading...</div>;
+    }
+    if (clients.length === 0) {
+      return <ClientsEmptyState onAdd={() => setAddOpen(true)} />;
+    }
+    if (filteredSorted.length === 0) {
+      return (
+        <div className="p-10 text-center text-[#64748b] text-sm" data-testid="clients-no-results">
+          No clients match &ldquo;{search}&rdquo;
+        </div>
+      );
+    }
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" data-testid="clients-table">
+          <thead>
+            <tr className="text-left text-[10px] uppercase tracking-[0.15em] text-[#64748b]">
+              {COLUMNS.map((col) => (
+                <th key={col.key} className="px-6 py-3 font-bold">
+                  <button
+                    onClick={() => handleSort(col.key)}
+                    data-testid={`sort-${col.key}`}
+                    className="inline-flex items-center gap-1 hover:text-white transition-colors uppercase tracking-[0.15em] font-bold"
+                  >
+                    {col.label}
+                    <SortIcon active={sortKey === col.key} dir={sortDir} />
+                  </button>
+                </th>
+              ))}
+              <th className="px-6 py-3 font-bold text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredSorted.map((c) => (
+              <tr
+                key={c.id}
+                onClick={() => navigate(`/clients/${c.id}`)}
+                data-testid={`client-row-${c.id}`}
+                className="border-t border-[#2e3245] hover:bg-[#1a1d27]/60 cursor-pointer transition-colors"
+              >
+                <td className="px-6 py-4 text-white font-medium">{c.name}</td>
+                <td className="px-6 py-4 text-[#94a3b8] font-mono text-xs">{c.domain}</td>
+                <td className="px-6 py-4">
+                  <span className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8]">
+                    {c.plan_tier}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  <StatusBadge active={c.active} testId={`status-${c.id}`} />
+                </td>
+                <td className="px-6 py-4 text-[#94a3b8] text-xs">{formatDate(c.created_at)}</td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center justify-end gap-1">
+                    <IconBtn
+                      title="Edit"
+                      testId={`edit-btn-${c.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/clients/${c.id}`);
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </IconBtn>
+                    <IconBtn
+                      title={c.active ? "Deactivate" : "Activate"}
+                      testId={`toggle-btn-${c.id}`}
+                      onClick={(e) => toggleActive(c, e)}
+                      colorClass={
+                        c.active
+                          ? "hover:text-[#ef4444] hover:border-[#ef4444]/40"
+                          : "hover:text-[#10b981] hover:border-[#10b981]/40"
+                      }
+                    >
+                      <Power className="h-3.5 w-3.5" />
+                    </IconBtn>
+                    <IconBtn
+                      title="Delete"
+                      testId={`delete-btn-${c.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setToDelete(c);
+                      }}
+                      colorClass="hover:text-[#ef4444] hover:border-[#ef4444]/40"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </IconBtn>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   return (
     <div data-testid="clients-page">
       <PageHeader
@@ -132,96 +230,7 @@ export default function Clients() {
           </div>
         </div>
 
-        {loading ? (
-          <div className="p-10 text-center text-[#64748b] text-sm">Loading...</div>
-        ) : clients.length === 0 ? (
-          <ClientsEmptyState onAdd={() => setAddOpen(true)} />
-        ) : filteredSorted.length === 0 ? (
-          <div className="p-10 text-center text-[#64748b] text-sm" data-testid="clients-no-results">
-            No clients match &ldquo;{search}&rdquo;
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm" data-testid="clients-table">
-              <thead>
-                <tr className="text-left text-[10px] uppercase tracking-[0.15em] text-[#64748b]">
-                  {COLUMNS.map((col) => (
-                    <th key={col.key} className="px-6 py-3 font-bold">
-                      <button
-                        onClick={() => handleSort(col.key)}
-                        data-testid={`sort-${col.key}`}
-                        className="inline-flex items-center gap-1 hover:text-white transition-colors uppercase tracking-[0.15em] font-bold"
-                      >
-                        {col.label}
-                        <SortIcon active={sortKey === col.key} dir={sortDir} />
-                      </button>
-                    </th>
-                  ))}
-                  <th className="px-6 py-3 font-bold text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredSorted.map((c) => (
-                  <tr
-                    key={c.id}
-                    onClick={() => navigate(`/clients/${c.id}`)}
-                    data-testid={`client-row-${c.id}`}
-                    className="border-t border-[#2e3245] hover:bg-[#1a1d27]/60 cursor-pointer transition-colors"
-                  >
-                    <td className="px-6 py-4 text-white font-medium">{c.name}</td>
-                    <td className="px-6 py-4 text-[#94a3b8] font-mono text-xs">{c.domain}</td>
-                    <td className="px-6 py-4">
-                      <span className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8]">
-                        {c.plan_tier}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge active={c.active} testId={`status-${c.id}`} />
-                    </td>
-                    <td className="px-6 py-4 text-[#94a3b8] text-xs">{formatDate(c.created_at)}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-1">
-                        <IconBtn
-                          title="Edit"
-                          testId={`edit-btn-${c.id}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/clients/${c.id}`);
-                          }}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </IconBtn>
-                        <IconBtn
-                          title={c.active ? "Deactivate" : "Activate"}
-                          testId={`toggle-btn-${c.id}`}
-                          onClick={(e) => toggleActive(c, e)}
-                          colorClass={
-                            c.active
-                              ? "hover:text-[#ef4444] hover:border-[#ef4444]/40"
-                              : "hover:text-[#10b981] hover:border-[#10b981]/40"
-                          }
-                        >
-                          <Power className="h-3.5 w-3.5" />
-                        </IconBtn>
-                        <IconBtn
-                          title="Delete"
-                          testId={`delete-btn-${c.id}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setToDelete(c);
-                          }}
-                          colorClass="hover:text-[#ef4444] hover:border-[#ef4444]/40"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </IconBtn>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {renderTable()}
       </div>
 
       <ClientFormModal open={addOpen} onOpenChange={setAddOpen} onCreated={() => load()} />

@@ -35,32 +35,16 @@ export default function EmbedCodePage() {
     );
   }, [clients, search]);
 
-  return (
-    <div data-testid="embed-code-page">
-      <PageHeader
-        eyebrow="Deployment"
-        title="Embed Code"
-        subtitle="One-click copy snippets for every client. Drop into their <body> tag to activate the widget."
-      />
-
-      <div className="bg-[#1e2130] border border-[#2e3245] rounded-xl px-5 py-4 mb-6">
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b] pointer-events-none" />
-          <Input
-            data-testid="embed-search-input"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by client or domain..."
-            className="pl-9 bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
-          />
-        </div>
-      </div>
-
-      {loading ? (
+  const renderGrid = () => {
+    if (loading) {
+      return (
         <div className="bg-[#1e2130] border border-[#2e3245] rounded-xl p-12 text-center text-[#64748b] text-sm">
           Loading snippets...
         </div>
-      ) : clients.length === 0 ? (
+      );
+    }
+    if (clients.length === 0) {
+      return (
         <div className="bg-[#1e2130] border border-[#2e3245] rounded-xl p-14 text-center" data-testid="embed-empty-state">
           <div className="h-14 w-14 mx-auto rounded-xl bg-[#0f1117] border border-[#2e3245] grid place-items-center mb-4">
             <Inbox className="h-6 w-6 text-[#64748b]" />
@@ -84,37 +68,66 @@ export default function EmbedCodePage() {
             </Button>
           </Link>
         </div>
-      ) : filtered.length === 0 ? (
+      );
+    }
+    if (filtered.length === 0) {
+      return (
         <div className="bg-[#1e2130] border border-[#2e3245] rounded-xl p-12 text-center text-[#64748b] text-sm">
           No clients match &ldquo;{search}&rdquo;
         </div>
-      ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-          {filtered.map((c) => (
-            <div
-              key={c.id}
-              data-testid={`embed-card-${c.id}`}
-              className="bg-[#1e2130] border border-[#2e3245] rounded-xl p-5 hover:border-[#3e445e] transition-colors"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <Link
-                    to={`/clients/${c.id}`}
-                    className="inline-flex items-center gap-1.5 text-white font-semibold tracking-tight hover:text-[#007bff] transition-colors"
-                    style={{ fontFamily: "Outfit, sans-serif" }}
-                  >
-                    {c.name}
-                    <ExternalLink className="h-3.5 w-3.5 opacity-60" />
-                  </Link>
-                  <div className="text-xs text-[#94a3b8] font-mono mt-1">{c.domain}</div>
-                </div>
-                <StatusBadge active={c.active} testId={`embed-status-${c.id}`} />
+      );
+    }
+    return (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        {filtered.map((c) => (
+          <div
+            key={c.id}
+            data-testid={`embed-card-${c.id}`}
+            className="bg-[#1e2130] border border-[#2e3245] rounded-xl p-5 hover:border-[#3e445e] transition-colors"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <Link
+                  to={`/clients/${c.id}`}
+                  className="inline-flex items-center gap-1.5 text-white font-semibold tracking-tight hover:text-[#007bff] transition-colors"
+                  style={{ fontFamily: "Outfit, sans-serif" }}
+                >
+                  {c.name}
+                  <ExternalLink className="h-3.5 w-3.5 opacity-60" />
+                </Link>
+                <div className="text-xs text-[#94a3b8] font-mono mt-1">{c.domain}</div>
               </div>
-              <EmbedCodeBlock code={generateEmbedCode(c.domain)} testId={`embed-block-${c.id}`} />
+              <StatusBadge active={c.active} testId={`embed-status-${c.id}`} />
             </div>
-          ))}
+            <EmbedCodeBlock code={generateEmbedCode(c.domain)} testId={`embed-block-${c.id}`} />
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div data-testid="embed-code-page">
+      <PageHeader
+        eyebrow="Deployment"
+        title="Embed Code"
+        subtitle="One-click copy snippets for every client. Drop into their <body> tag to activate the widget."
+      />
+
+      <div className="bg-[#1e2130] border border-[#2e3245] rounded-xl px-5 py-4 mb-6">
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b] pointer-events-none" />
+          <Input
+            data-testid="embed-search-input"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by client or domain..."
+            className="pl-9 bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
+          />
         </div>
-      )}
+      </div>
+
+      {renderGrid()}
     </div>
   );
 }
