@@ -289,3 +289,4 @@ function ClientsEmptyState({ onAdd }) {
     </div>
   );
 }
+
