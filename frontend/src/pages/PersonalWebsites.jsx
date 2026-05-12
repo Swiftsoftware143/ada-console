@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Edit2, Trash2, ArrowRightLeft, X, Globe } from "lucide-react";
+import { Plus, Edit2, Trash2, ArrowRightLeft, X as XIcon, Globe } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -320,7 +320,7 @@ export default function PersonalWebsites() {
               <div className="flex flex-wrap gap-2 mb-3">
                 {categories.map(cat => (
                   <span key={cat} className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#0f1117] text-[#94a3b8] text-sm">
-                    {cat}<button onClick={() => handleDeleteCategory(cat)} className="text-red-400 hover:text-red-300"><X className="h-3 w-3" /></button>
+                    {cat}<button onClick={() => handleDeleteCategory(cat)} className="text-red-400 hover:text-red-300"><XIcon className="h-3 w-3" /></button>
                   </span>
                 ))}
               </div>
@@ -334,7 +334,7 @@ export default function PersonalWebsites() {
               <div className="flex flex-wrap gap-2 mb-3">
                 {locations.map(loc => (
                   <span key={loc} className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#0f1117] text-[#94a3b8] text-sm">
-                    {loc}<button onClick={() => handleDeleteLocation(loc)} className="text-red-400 hover:text-red-300"><X className="h-3 w-3" /></button>
+                    {loc}<button onClick={() => handleDeleteLocation(loc)} className="text-red-400 hover:text-red-300"><XIcon className="h-3 w-3" /></button>
                   </span>
                 ))}
               </div>
