@@ -1,0 +1,30 @@
+[build]
+  base = "frontend"
+  publish = "build"
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NPM_FLAGS = "--legacy-peer-deps"
+
+# Domain configuration
+# Primary domain: adaswift.netlify.app
+# To add custom domain, use Netlify UI or add below:
+# [[redirects]]
+#    from = "/*"
+#    to = "/index.html"
+#    status = 200
+
+[headers]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Handle client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
