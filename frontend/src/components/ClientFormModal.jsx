@@ -68,8 +68,7 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
     const { data, error } = await supabase
       .from("clients")
       .insert(payload)
-      .select()
-      .single();
+      .select();
 
     setSaving(false);
 
@@ -82,8 +81,8 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
       return;
     }
 
-    toast.success(`${data.name} added successfully`);
-    onCreated?.(data);
+    toast.success(`${data?.[0]?.name || "Client"} added successfully`);
+    onCreated?.(data?.[0]);
     onOpenChange(false);
   };
 
