@@ -281,7 +281,7 @@ export default function PersonalWebsiteDetail() {
           </Section>
 
           {/* Section 3: Profiles */}
-          <Section title="Default Profiles" testId="section-profiles" subtitle="Pre-enabled accessibility profiles when a visitor opens the widget.">
+          <Section title="Default Profiles" testId="section-profiles" subtitle="Select which profile buttons appear in the widget. All features start OFF.">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {Object.entries(PROFILE_LABELS).map(([key, label]) => (
                 <ToggleRow
@@ -296,7 +296,7 @@ export default function PersonalWebsiteDetail() {
           </Section>
 
           {/* Section 4: Features */}
-          <Section title="Default Features" testId="section-features" subtitle="Content-level features pre-enabled for visitors.">
+          <Section title="Default Features" testId="section-features" subtitle="Select which feature buttons appear in the widget. All features start OFF.">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {Object.entries(FEATURE_LABELS).map(([key, label]) => (
                 <ToggleRow
