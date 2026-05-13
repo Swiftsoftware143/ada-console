@@ -243,7 +243,7 @@ export default function PersonalWebsites() {
       <DeleteConfirmModal
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}
-        onConfirm={confirmDelete}
+        onConfirm={handleDelete}
         clientName={toDelete?.name}
       />
     </div>
