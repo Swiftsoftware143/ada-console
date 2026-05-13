@@ -99,6 +99,8 @@ export default function ClientDetail({ isPersonal = false }) {
       name: client.name.trim(),
       domain: cleanDomain(client.domain),
       plan_tier: client.plan_tier,
+      category: client.category?.trim() || null,
+      location: client.location?.trim() || null,
       notes: client.notes?.trim() || null,
       active: client.active,
       widget_position: client.widget_position,
