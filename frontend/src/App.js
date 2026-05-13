@@ -18,6 +18,7 @@ function App() {
             <Route path="/clients" element={<Clients />} />
             <Route path="/clients/:id" element={<ClientDetail />} />
             <Route path="/personal-websites" element={<PersonalWebsites />} />
+            <Route path="/personal-websites/:id" element={<ClientDetail isPersonal={true} />} />
             <Route path="/embed" element={<EmbedCodePage />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
