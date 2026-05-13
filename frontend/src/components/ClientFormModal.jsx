@@ -76,20 +76,15 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
     if (error) {
       if (error.code === "23505") {
         toast.error("A website with this domain already exists");
-      } else if (error.message && error.message.includes("body stream")) {
-        // Response already consumed, but insert likely succeeded
-        toast.success(isPersonal ? "Website added successfully" : "Client added successfully");
-        onCreated?.();
-        onOpenChange(false);
-        return;
       } else {
         toast.error(error.message || "Failed to create website");
       }
       return;
     }
 
-    toast.success(`${data?.[0]?.name || "Client"} added successfully`);
-    onCreated?.(data?.[0]);
+    // Always call onCreated to refresh the list, even if data is missing
+    toast.success(isPersonal ? "Website added successfully" : "Client added successfully");
+    onCreated?.(data?.[0] || { id: Date.now() }); // Fallback ID to trigger refresh
     onOpenChange(false);
   };
 
