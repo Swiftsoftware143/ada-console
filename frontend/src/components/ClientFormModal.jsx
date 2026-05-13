@@ -45,17 +45,22 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
   }, [open]);
 
   const loadCategories = async () => {
-    const [{ data: clients }, { data: websites }] = await Promise.all([
-      supabase.from("clients").select("category"),
-      supabase.from("personal_websites").select("category"),
-    ]);
-    
-    const allCategories = new Set();
-    [...(clients || []), ...(websites || [])].forEach(item => {
-      if (item.category) allCategories.add(item.category);
-    });
-    
-    setCategories(Array.from(allCategories).sort());
+    try {
+      const [{ data: clients }, { data: websites }] = await Promise.all([
+        supabase.from("clients").select("category"),
+        supabase.from("personal_websites").select("category"),
+      ]);
+      
+      const allCategories = new Set();
+      [...(clients || []), ...(websites || [])].forEach(item => {
+        if (item.category) allCategories.add(item.category);
+      });
+      
+      setCategories(Array.from(allCategories).sort());
+    } catch (err) {
+      console.error("Error loading categories:", err);
+      setCategories([]);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -74,9 +79,9 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
       name: form.name.trim(),
       domain: cleanDomain(form.domain),
       plan_tier: form.plan_tier,
-      category: form.category || null,
-      location: form.location.trim() || null,
-      notes: form.notes.trim() || null,
+      category: form.category?.trim() || null,
+      location: form.location?.trim() || null,
+      notes: form.notes?.trim() || null,
       active: false,
       agency_name: "SwiftImpact Solutions",
       cta_url: "https://swiftimpactsolutions.com/ada",
@@ -88,26 +93,33 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
 
     const tableName = isPersonal ? "personal_websites" : "clients";
     console.log("Inserting into", tableName, "payload:", payload);
-    const { data, error } = await supabase
-      .from(tableName)
-      .insert(payload)
-      .select();
-    console.log("Insert result:", { data, error });
+    
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .insert(payload)
+        .select();
+      console.log("Insert result:", { data, error });
 
-    setSaving(false);
+      setSaving(false);
 
-    if (error) {
-      if (error.code === "23505") {
-        toast.error("A website with this domain already exists");
-      } else {
-        toast.error(error.message || "Failed to create website");
+      if (error) {
+        if (error.code === "23505") {
+          toast.error("A website with this domain already exists");
+        } else {
+          toast.error(error.message || "Failed to create website");
+        }
+        return;
       }
-      return;
-    }
 
-    toast.success(isPersonal ? "Website added successfully" : "Client added successfully");
-    onCreated?.(data?.[0] || { id: Date.now() });
-    onOpenChange(false);
+      toast.success(isPersonal ? "Website added successfully" : "Client added successfully");
+      onCreated?.(data?.[0] || { id: Date.now() });
+      onOpenChange(false);
+    } catch (err) {
+      setSaving(false);
+      console.error("Submit error:", err);
+      toast.error("An unexpected error occurred");
+    }
   };
 
   return (
@@ -164,20 +176,18 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
               <Label className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
                 Category
               </Label>
-              <Select
+              <Input
                 value={form.category}
-                onValueChange={(v) => setForm({ ...form, category: v })}
-              >
-                <SelectTrigger className="bg-[#0f1117] border-[#2e3245] text-white focus:ring-[#007bff]">
-                  <SelectValue placeholder="Select or type..." />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1e2130] border-[#2e3245] text-white">
-                  <SelectItem value="">None</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                placeholder="Type or select..."
+                list="category-options"
+                className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
+              />
+              <datalist id="category-options">
+                {categories.map((cat) => (
+                  <option key={cat} value={cat} />
+                ))}
+              </datalist>
             </div>
 
             <div className="space-y-1.5">
