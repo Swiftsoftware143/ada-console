@@ -309,8 +309,7 @@
 </button>
 <div id="aw-panel" class="aw-hidden" role="dialog" aria-modal="true" aria-label="Accessibility Menu">
   <a id="aw-cta" href="${CTA_URL}" target="_blank" rel="noopener noreferrer">
-    <strong>♿ Accessibility Services by ${AGENCY}</strong>
-    Get a free ADA audit for ${DOMAIN}
+    <strong>♿ Get a free ADA audit</strong>
   </a>
   <div id="aw-header">
     <h2>Accessibility Menu</h2>
