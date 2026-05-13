@@ -229,19 +229,29 @@ export default function ClientDetail({ isPersonal = false }) {
             </Field>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Category">
-                <Input
-                  data-testid="field-category"
-                  value={client.category || ""}
-                  onChange={(e) => update({ category: e.target.value })}
-                  placeholder="e.g., E-commerce, Local Business"
-                  list="category-suggestions"
-                  className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
-                />
+                <div className="relative">
+                  <Input
+                    data-testid="field-category"
+                    value={client.category || ""}
+                    onChange={(e) => update({ category: e.target.value })}
+                    placeholder="Type or select category..."
+                    list="category-suggestions"
+                    className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent pr-10"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] pointer-events-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </div>
+                </div>
                 <datalist id="category-suggestions">
                   {categories.map((cat) => (
                     <option key={cat} value={cat} />
                   ))}
                 </datalist>
+                {categories.length === 0 && (
+                  <p className="text-xs text-[#64748b] mt-1">No existing categories. Type to create one.</p>
+                )}
               </Field>
               <Field label="Location">
                 <Input
