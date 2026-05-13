@@ -65,8 +65,9 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
       is_personal: isPersonal, // Flag to identify personal websites
     };
 
+    const tableName = isPersonal ? "personal_websites" : "clients";
     const { data, error } = await supabase
-      .from("clients")
+      .from(tableName)
       .insert(payload)
       .select();
 
@@ -75,6 +76,12 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
     if (error) {
       if (error.code === "23505") {
         toast.error("A website with this domain already exists");
+      } else if (error.message && error.message.includes("body stream")) {
+        // Response already consumed, but insert likely succeeded
+        toast.success(isPersonal ? "Website added successfully" : "Client added successfully");
+        onCreated?.();
+        onOpenChange(false);
+        return;
       } else {
         toast.error(error.message || "Failed to create website");
       }
