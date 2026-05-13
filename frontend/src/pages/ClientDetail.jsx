@@ -112,14 +112,16 @@ export default function ClientDetail({ isPersonal = false }) {
       .from(isPersonal ? "personal_websites" : "clients")
       .update(payload)
       .eq("id", client.id)
-      .select()
+      .select("*")
       .single();
     setSaving(false);
     if (error) {
+      console.error("Save error:", error);
       if (error.code === "23505") toast.error("Another client already uses this domain");
       else toast.error(error.message || "Failed to save");
       return;
     }
+    console.log("Save response:", data);
     setClient(hydrate(data));
     toast.success("Changes saved");
   };
