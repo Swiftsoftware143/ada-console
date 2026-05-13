@@ -10,20 +10,33 @@ import {
   ArrowUp,
   ArrowDown,
   Inbox,
+  Tag,
+  MapPin,
+  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { formatDate, sortByKey, filterClients } from "@/lib/helpers";
+import { formatDate, sortByKey } from "@/lib/helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import StatusBadge from "@/components/StatusBadge";
 import PageHeader from "@/components/PageHeader";
-import PersonalWebsiteFormModal from "@/components/PersonalWebsiteFormModal";
+import ClientFormModal from "@/components/ClientFormModal";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import CategoryManager from "@/components/CategoryManager";
 import { toast } from "sonner";
 
 const COLUMNS = [
   { key: "name", label: "Website Name" },
   { key: "domain", label: "Domain" },
+  { key: "category", label: "Category" },
+  { key: "location", label: "Location" },
   { key: "plan_tier", label: "Plan Tier" },
   { key: "active", label: "Status" },
   { key: "created_at", label: "Date Added" },
@@ -33,11 +46,33 @@ export default function PersonalWebsites() {
   const [websites, setWebsites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [categories, setCategories] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [sortKey, setSortKey] = useState("created_at");
   const [sortDir, setSortDir] = useState("desc");
   const [addOpen, setAddOpen] = useState(false);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [toDelete, setToDelete] = useState(null);
   const navigate = useNavigate();
+
+  const loadFilters = useCallback(async () => {
+    const [{ data: clientsData }, { data: websitesData }] = await Promise.all([
+      supabase.from("clients").select("category,location"),
+      supabase.from("personal_websites").select("category,location"),
+    ]);
+    
+    const allCats = new Set();
+    const allLocs = new Set();
+    [...(clientsData || []), ...(websitesData || [])].forEach(item => {
+      if (item.category) allCats.add(item.category);
+      if (item.location) allLocs.add(item.location);
+    });
+    
+    setCategories(Array.from(allCats).sort());
+    setLocations(Array.from(allLocs).sort());
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,7 +89,8 @@ export default function PersonalWebsites() {
       setWebsites(data || []);
     }
     setLoading(false);
-  }, []);
+    loadFilters();
+  }, [loadFilters]);
 
   useEffect(() => {
     load();
@@ -73,20 +109,21 @@ export default function PersonalWebsites() {
     }
     toast.success(`${website.name} ${newVal ? "activated" : "deactivated"}`);
     setWebsites((prev) =>
-      prev.map((c) => (c.id === website.id ? { ...c, active: newVal } : c))
+      prev.map((w) => (w.id === website.id ? { ...w, active: newVal } : w))
     );
   };
 
-  const handleDelete = async () => {
+  const confirmDelete = async () => {
     if (!toDelete) return;
     const { error } = await supabase.from("personal_websites").delete().eq("id", toDelete.id);
     if (error) {
-      toast.error("Failed to delete client");
+      toast.error("Failed to delete website");
       return;
     }
     toast.success(`${toDelete.name} deleted`);
-    setWebsites((prev) => prev.filter((c) => c.id !== toDelete.id));
+    setWebsites((prev) => prev.filter((w) => w.id !== toDelete.id));
     setToDelete(null);
+    loadFilters();
   };
 
   const handleSort = (key) => {
@@ -98,22 +135,55 @@ export default function PersonalWebsites() {
     }
   };
 
+  const filteredWebsites = useMemo(() => {
+    return websites.filter((w) => {
+      const matchesSearch =
+        search === "" ||
+        w.name?.toLowerCase().includes(search.toLowerCase()) ||
+        w.domain?.toLowerCase().includes(search.toLowerCase()) ||
+        w.plan_tier?.toLowerCase().includes(search.toLowerCase()) ||
+        w.category?.toLowerCase().includes(search.toLowerCase()) ||
+        w.location?.toLowerCase().includes(search.toLowerCase());
+      
+      const matchesCategory = categoryFilter === "all" || w.category === categoryFilter;
+      const matchesLocation = locationFilter === "all" || w.location === locationFilter;
+      
+      return matchesSearch && matchesCategory && matchesLocation;
+    });
+  }, [websites, search, categoryFilter, locationFilter]);
+
   const filteredSorted = useMemo(
-    () => sortByKey(websites.filter(w => (w.name?.toLowerCase() || "").includes(search.toLowerCase()) || (w.domain?.toLowerCase() || "").includes(search.toLowerCase())), sortKey, sortDir),
-    [websites, search, sortKey, sortDir]
+    () => sortByKey(filteredWebsites, sortKey, sortDir),
+    [filteredWebsites, sortKey, sortDir]
   );
+
+  const clearFilters = () => {
+    setCategoryFilter("all");
+    setLocationFilter("all");
+    setSearch("");
+  };
+
+  const hasFilters = categoryFilter !== "all" || locationFilter !== "all" || search !== "";
 
   const renderTable = () => {
     if (loading) {
       return <div className="p-10 text-center text-[#64748b] text-sm">Loading...</div>;
     }
     if (websites.length === 0) {
-      return <EmptyState onAdd={() => setAddOpen(true)} />;
+      return <WebsitesEmptyState onAdd={() => setAddOpen(true)} />;
     }
     if (filteredSorted.length === 0) {
       return (
-        <div className="p-10 text-center text-[#64748b] text-sm" data-testid="no-results">
-          No clients match &ldquo;{search}&rdquo;
+        <div className="p-10 text-center text-[#64748b] text-sm" data-testid="websites-no-results">
+          No websites match your filters
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="ml-2 text-[#007bff] hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       );
     }
@@ -138,42 +208,62 @@ export default function PersonalWebsites() {
             </tr>
           </thead>
           <tbody>
-            {filteredSorted.map((c) => (
+            {filteredSorted.map((w) => (
               <tr
-                key={c.id}
-                onClick={() => navigate(`/personal-websites/${c.id}`)}
-                data-testid={`client-row-${c.id}`}
+                key={w.id}
+                onClick={() => navigate(`/personal-websites/${w.id}`)}
+                data-testid={`website-row-${w.id}`}
                 className="border-t border-[#2e3245] hover:bg-[#1a1d27]/60 cursor-pointer transition-colors"
               >
-                <td className="px-6 py-4 text-white font-medium">{c.name}</td>
-                <td className="px-6 py-4 text-[#94a3b8] font-mono text-xs">{c.domain}</td>
+                <td className="px-6 py-4 text-white font-medium">{w.name}</td>
+                <td className="px-6 py-4 text-[#94a3b8] font-mono text-xs">{w.domain}</td>
+                <td className="px-6 py-4">
+                  {w.category ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#007bff]/10 text-[#007bff] text-xs">
+                      <Tag className="h-3 w-3" />
+                      {w.category}
+                    </span>
+                  ) : (
+                    <span className="text-[#64748b] text-xs">-</span>
+                  )}
+                </td>
+                <td className="px-6 py-4">
+                  {w.location ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#10b981]/10 text-[#10b981] text-xs">
+                      <MapPin className="h-3 w-3" />
+                      {w.location}
+                    </span>
+                  ) : (
+                    <span className="text-[#64748b] text-xs">-</span>
+                  )}
+                </td>
                 <td className="px-6 py-4">
                   <span className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8]">
-                    {c.plan_tier}
+                    {w.plan_tier}
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <StatusBadge active={c.active} testId={`status-${c.id}`} />
+                  <StatusBadge active={w.active} testId={`status-${w.id}`} />
                 </td>
-                <td className="px-6 py-4 text-[#94a3b8] text-xs">{formatDate(c.created_at)}</td>
+                <td className="px-6 py-4 text-[#94a3b8] text-xs">{formatDate(w.created_at)}</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center justify-end gap-1">
                     <IconBtn
                       title="Edit"
-                      testId={`edit-btn-${c.id}`}
+                      testId={`edit-btn-${w.id}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/personal-websites/${c.id}`);
+                        navigate(`/personal-websites/${w.id}`);
                       }}
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </IconBtn>
                     <IconBtn
-                      title={c.active ? "Deactivate" : "Activate"}
-                      testId={`toggle-btn-${c.id}`}
-                      onClick={(e) => toggleActive(c, e)}
+                      title={w.active ? "Deactivate" : "Activate"}
+                      testId={`toggle-btn-${w.id}`}
+                      onClick={(e) => toggleActive(w, e)}
                       colorClass={
-                        c.active
+                        w.active
                           ? "hover:text-[#ef4444] hover:border-[#ef4444]/40"
                           : "hover:text-[#10b981] hover:border-[#10b981]/40"
                       }
@@ -182,10 +272,10 @@ export default function PersonalWebsites() {
                     </IconBtn>
                     <IconBtn
                       title="Delete"
-                      testId={`delete-btn-${c.id}`}
+                      testId={`delete-btn-${w.id}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setToDelete(c);
+                        setToDelete(w);
                       }}
                       colorClass="hover:text-[#ef4444] hover:border-[#ef4444]/40"
                     >
@@ -202,48 +292,110 @@ export default function PersonalWebsites() {
   };
 
   return (
-    <div data-testid="personal-websites-page">
+    <div data-testid="websites-page">
       <PageHeader
-        eyebrow="My Websites"
+        eyebrow="Accounts"
         title="Personal Websites"
-        subtitle="Manage ADA widgets for your own websites."
+        subtitle="Manage your personal websites with the SwiftImpact ADA widget."
         actions={
-          <Button
-            data-testid="add-website-btn"
-            onClick={() => setAddOpen(true)}
-            className="bg-[#007bff] hover:bg-[#0056b3] text-white shadow-[0_0_15px_rgba(0,123,255,0.25)] hover:shadow-[0_0_22px_rgba(0,123,255,0.45)] transition-shadow"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Website
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCategoryManagerOpen(true)}
+              className="border-[#2e3245] text-[#94a3b8] hover:text-white hover:border-[#3e445e]"
+            >
+              <Tag className="h-4 w-4 mr-2" />
+              Categories
+            </Button>
+            <Button
+              data-testid="add-new-website-btn"
+              onClick={() => setAddOpen(true)}
+              className="bg-[#007bff] hover:bg-[#0056b3] text-white shadow-[0_0_15px_rgba(0,123,255,0.25)] hover:shadow-[0_0_22px_rgba(0,123,255,0.45)] transition-shadow"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add new website
+            </Button>
+          </div>
         }
       />
 
       <div className="bg-[#1e2130] border border-[#2e3245] rounded-xl">
-        <div className="px-6 py-4 border-b border-[#2e3245] flex items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b] pointer-events-none" />
-            <Input
-              data-testid="websites-search-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search websites..."
-              className="pl-9 bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
-            />
+        <div className="px-6 py-4 border-b border-[#2e3245] space-y-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b] pointer-events-none" />
+              <Input
+                data-testid="websites-search-input"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search websites, domains, plans..."
+                className="pl-9 bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
+              />
+            </div>
+            
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[160px] bg-[#0f1117] border-[#2e3245] text-white">
+                <Tag className="h-4 w-4 mr-2 text-[#64748b]" />
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1e2130] border-[#2e3245]">
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger className="w-[160px] bg-[#0f1117] border-[#2e3245] text-white">
+                <MapPin className="h-4 w-4 mr-2 text-[#64748b]" />
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1e2130] border-[#2e3245]">
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map((loc) => (
+                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {hasFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="text-[#64748b] hover:text-white"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
           </div>
+          
           <div className="text-xs text-[#64748b]" data-testid="websites-count">
             {filteredSorted.length} {filteredSorted.length === 1 ? "website" : "websites"}
+            {hasFilters && ` (filtered from ${websites.length})`}
           </div>
         </div>
 
         {renderTable()}
       </div>
 
-      <PersonalWebsiteFormModal open={addOpen} onOpenChange={setAddOpen} onCreated={() => load()} />
+      <ClientFormModal 
+        open={addOpen} 
+        onOpenChange={setAddOpen} 
+        onCreated={() => { console.log("Website created, refreshing..."); load(); }}
+        isPersonal={true}
+      />
+      <CategoryManager 
+        open={categoryManagerOpen} 
+        onOpenChange={setCategoryManagerOpen} 
+        onCategoriesChange={loadFilters}
+      />
       <DeleteConfirmModal
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmDelete}
         clientName={toDelete?.name}
       />
     </div>
@@ -269,7 +421,7 @@ function IconBtn({ children, onClick, title, testId, colorClass = "hover:text-wh
   );
 }
 
-function EmptyState({ onAdd }) {
+function WebsitesEmptyState({ onAdd }) {
   return (
     <div className="p-14 text-center" data-testid="websites-empty-state">
       <div className="h-14 w-14 mx-auto rounded-xl bg-[#0f1117] border border-[#2e3245] grid place-items-center mb-4">
@@ -279,14 +431,14 @@ function EmptyState({ onAdd }) {
         className="text-white font-semibold tracking-tight text-lg"
         style={{ fontFamily: "Outfit, sans-serif" }}
       >
-        No personal websites yet
+        No websites yet
       </h3>
       <p className="text-sm text-[#94a3b8] mt-1.5 mb-5">
-        Add your first website to get an ADA widget.
+        Add your first personal website.
       </p>
       <Button
         onClick={onAdd}
-        data-testid="empty-add-btn"
+        data-testid="empty-add-first-btn"
         className="bg-[#007bff] hover:bg-[#0056b3] text-white shadow-[0_0_15px_rgba(0,123,255,0.25)]"
       >
         <Plus className="h-4 w-4 mr-2" />
@@ -295,4 +447,3 @@ function EmptyState({ onAdd }) {
     </div>
   );
 }
-
