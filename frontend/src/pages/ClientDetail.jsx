@@ -26,23 +26,7 @@ import MasterStatusHero from "@/components/MasterStatusHero";
 import EmbedCodeBlock from "@/components/EmbedCodeBlock";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
-const loadCategories = async () => {
-    console.log("Loading categories...");
-    const [{ data: clients }, { data: websites }] = await Promise.all([
-      supabase.from("clients").select("category"),
-      supabase.from("personal_websites").select("category"),
-    ]);
-    console.log("Loaded clients:", clients?.length, "websites:", websites?.length);
-    const allCats = new Set(["Ecommerce", "Newsletters", "SaaS"]);
-    [...(clients || []), ...(websites || [])].forEach(item => {
-      if (item.category) allCats.add(item.category);
-    });
-    const sortedCats = Array.from(allCats).sort();
-    console.log("Categories set:", sortedCats);
-    setCategories(sortedCats);
-  };
-
-  const hydrate = (data) => ({
+const hydrate = (data) => ({
   ...data,
   enabled_profiles: { ...DEFAULT_PROFILES, ...(data.enabled_profiles || {}) },
   enabled_features: { ...DEFAULT_FEATURES, ...(data.enabled_features || {}) },
@@ -55,8 +39,23 @@ export default function ClientDetail({ isPersonal = false }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [categories, setCategories] = useState([]);
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [categories, setCategories] = useState(["Ecommerce", "Newsletters", "SaaS"]);
+
+  const loadCategories = useCallback(async () => {
+    try {
+      const [{ data: clients }, { data: websites }] = await Promise.all([
+        supabase.from("clients").select("category"),
+        supabase.from("personal_websites").select("category"),
+      ]);
+      const allCats = new Set(["Ecommerce", "Newsletters", "SaaS"]);
+      [...(clients || []), ...(websites || [])].forEach(item => {
+        if (item.category) allCats.add(item.category);
+      });
+      setCategories(Array.from(allCats).sort());
+    } catch (err) {
+      console.error("Error loading categories:", err);
+    }
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -74,8 +73,8 @@ export default function ClientDetail({ isPersonal = false }) {
         return;
       }
       setClient(hydrate(data));
-      await loadCategories(); // Wait for categories to load
-      if (alive) setLoading(false);
+      loadCategories(); // Load categories in background
+      setLoading(false);
     })();
     return () => {
       alive = false;
