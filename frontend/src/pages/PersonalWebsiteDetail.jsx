@@ -99,6 +99,8 @@ export default function PersonalWebsiteDetail() {
       name: website.name.trim(),
       domain: cleanDomain(website.domain),
       plan_tier: website.plan_tier,
+      category: website.category?.trim() || null,
+      location: website.location?.trim() || null,
       notes: website.notes?.trim() || null,
       active: website.active,
       widget_position: website.widget_position,
