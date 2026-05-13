@@ -92,7 +92,7 @@ export default function PersonalWebsites() {
     }
   };
 
-  const filtered = useMemo(
+  const filteredSorted = useMemo(
     () => sortByKey(websites.filter(w => (w.name?.toLowerCase() || "").includes(search.toLowerCase()) || (w.domain?.toLowerCase() || "").includes(search.toLowerCase())), sortKey, sortDir),
     [websites, search, sortKey, sortDir]
   );
