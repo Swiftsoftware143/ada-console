@@ -487,7 +487,10 @@
     function openPanel()  { S.open=true;  panel.classList.remove("aw-hidden"); trigger.setAttribute("aria-expanded","true");  closeBtn.focus(); }
     function closePanel() { S.open=false; panel.classList.add("aw-hidden");    trigger.setAttribute("aria-expanded","false"); trigger.focus(); }
 
-    trigger.addEventListener("click",()=>S.open?closePanel():openPanel());
+    trigger.addEventListener("click",()=>{
+      console.log('[ADA] Widget button clicked, open:', !S.open);
+      S.open?closePanel():openPanel();
+    });
     closeBtn.addEventListener("click",closePanel);
     document.addEventListener("click",e=>{ if(S.open&&!host.contains(e.target)) closePanel(); });
     document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&S.open) closePanel(); });
@@ -610,10 +613,8 @@
       if(cpB) cpB.value="#ffffff";
     });
 
-    /* Apply any default features that were pre-enabled in Supabase config */
-    Object.keys(FEATURES).forEach(key=>{ if(FEATURES[key]) applyToggle(key,true); });
-    Object.keys(PROFILES).forEach(key=>{ if(PROFILES[key]&&PROFILE_EFFECTS[key]) PROFILE_EFFECTS[key](); });
-    renderPageCSS();
+    /* Widget loaded - all features start disabled, user must toggle them on */
+    console.log('[ADA] Widget ready - waiting for user interaction');
   }
 
 })();
