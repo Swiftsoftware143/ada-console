@@ -56,6 +56,7 @@ export default function PersonalWebsiteDetail() {
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -235,25 +236,41 @@ export default function PersonalWebsiteDetail() {
                   <Input
                     data-testid="field-category"
                     value={website.category || ""}
-                    onChange={(e) => update({ category: e.target.value })}
+                    onChange={(e) => {
+                      update({ category: e.target.value });
+                      setShowCategoryDropdown(true);
+                    }}
+                    onFocus={() => setShowCategoryDropdown(true)}
                     placeholder="Type or select category..."
-                    list="category-suggestions"
                     className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent pr-10"
                   />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] pointer-events-none">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-white transition-colors cursor-pointer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showCategoryDropdown ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                       <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
-                  </div>
+                  </button>
+                  {showCategoryDropdown && categories.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-[#1e2130] border border-[#2e3245] rounded-md shadow-lg max-h-60 overflow-auto">
+                      {categories.map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            update({ category: cat });
+                            setShowCategoryDropdown(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-white hover:bg-[#007bff] hover:text-white transition-colors"
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <datalist id="category-suggestions">
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat} />
-                  ))}
-                </datalist>
-                {categories.length === 0 && (
-                  <p className="text-xs text-[#64748b] mt-1">No existing categories. Type to create one.</p>
-                )}
               </Field>
               <Field label="Location">
                 <Input
