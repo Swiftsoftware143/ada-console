@@ -1,26 +1,3 @@
-/* ── URL REDIRECT SAFETY NET ─────────────────────────────────────────────
- If this file is ever loaded from the old CDN URL, it will still work.
- All future requests should use: https://adaswift.netlify.app/loader.js
-──────────────────────────────────────────────────────────────────────── */
-(function() {
-  var CORRECT_URL = "https://adaswift.netlify.app/loader.js";
-  var LEGACY_DOMAINS = ["cdn.swiftimpactsolutions.com", "adaswift.netlify.app"];
-  var currentSrc = document.currentScript && document.currentScript.src;
-  if (currentSrc) {
-    var isLegacy = LEGACY_DOMAINS.some(function(d) { return currentSrc.indexOf(d) > -1; });
-    if (isLegacy) {
-      var s = document.createElement("script");
-      s.src = CORRECT_URL;
-      var dataDomain = document.currentScript.getAttribute("data-domain");
-      if (dataDomain) s.setAttribute("data-domain", dataDomain);
-      s.async = true;
-      document.body.appendChild(s);
-      return;
-    }
-  }
-})();
-
-
 (function () {
   "use strict";
 
