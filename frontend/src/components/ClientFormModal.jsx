@@ -27,16 +27,36 @@ const initialState = {
   name: "",
   domain: "",
   plan_tier: "basic",
+  category: "",
+  location: "",
   notes: "",
 };
 
 export default function ClientFormModal({ open, onOpenChange, onCreated, isPersonal = false }) {
   const [form, setForm] = useState(initialState);
+  const [categories, setCategories] = useState([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) setForm(initialState);
+    if (open) {
+      setForm(initialState);
+      loadCategories();
+    }
   }, [open]);
+
+  const loadCategories = async () => {
+    const [{ data: clients }, { data: websites }] = await Promise.all([
+      supabase.from("clients").select("category"),
+      supabase.from("personal_websites").select("category"),
+    ]);
+    
+    const allCategories = new Set();
+    [...(clients || []), ...(websites || [])].forEach(item => {
+      if (item.category) allCategories.add(item.category);
+    });
+    
+    setCategories(Array.from(allCategories).sort());
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -54,6 +74,8 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
       name: form.name.trim(),
       domain: cleanDomain(form.domain),
       plan_tier: form.plan_tier,
+      category: form.category || null,
+      location: form.location.trim() || null,
       notes: form.notes.trim() || null,
       active: false,
       agency_name: "SwiftImpact Solutions",
@@ -83,9 +105,8 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
       return;
     }
 
-    // Always call onCreated to refresh the list, even if data is missing
     toast.success(isPersonal ? "Website added successfully" : "Client added successfully");
-    onCreated?.(data?.[0] || { id: Date.now() }); // Fallback ID to trigger refresh
+    onCreated?.(data?.[0] || { id: Date.now() });
     onOpenChange(false);
   };
 
@@ -136,6 +157,40 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
             <p className="text-xs text-[#64748b]">
               https://, www., and trailing slashes are stripped automatically.
             </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
+                Category
+              </Label>
+              <Select
+                value={form.category}
+                onValueChange={(v) => setForm({ ...form, category: v })}
+              >
+                <SelectTrigger className="bg-[#0f1117] border-[#2e3245] text-white focus:ring-[#007bff]">
+                  <SelectValue placeholder="Select or type..." />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1e2130] border-[#2e3245] text-white">
+                  <SelectItem value="">None</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
+                Location
+              </Label>
+              <Input
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+                placeholder="City, State"
+                className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">
