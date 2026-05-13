@@ -7,6 +7,7 @@ import ClientDetail from "@/pages/ClientDetail";
 import EmbedCodePage from "@/pages/EmbedCodePage";
 import Settings from "@/pages/Settings";
 import PersonalWebsites from "@/pages/PersonalWebsites";
+import PersonalWebsiteDetail from "@/pages/PersonalWebsiteDetail";
 
 function App() {
   return (
@@ -18,7 +19,7 @@ function App() {
             <Route path="/clients" element={<Clients />} />
             <Route path="/clients/:id" element={<ClientDetail />} />
             <Route path="/personal-websites" element={<PersonalWebsites />} />
-            <Route path="/personal-websites/:id" element={<ClientDetail isPersonal={true} />} />
+            <Route path="/personal-websites/:id" element={<PersonalWebsiteDetail />} />
             <Route path="/embed" element={<EmbedCodePage />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
