@@ -41,12 +41,18 @@ export default function Clients() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    console.log("Loading clients...");
     const { data, error } = await supabase
       .from("clients")
       .select("*")
       .order("created_at", { ascending: false });
-    if (error) toast.error(error.message);
-    else setClients(data || []);
+    if (error) {
+      console.error("Error loading clients:", error);
+      toast.error(error.message);
+    } else {
+      console.log("Loaded clients:", data?.length || 0, data);
+      setClients(data || []);
+    }
     setLoading(false);
   }, []);
 
@@ -233,7 +239,7 @@ export default function Clients() {
         {renderTable()}
       </div>
 
-      <ClientFormModal open={addOpen} onOpenChange={setAddOpen} onCreated={() => load()} />
+      <ClientFormModal open={addOpen} onOpenChange={setAddOpen} onCreated={() => { console.log("Client created, refreshing..."); load(); }} />
       <DeleteConfirmModal
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}
