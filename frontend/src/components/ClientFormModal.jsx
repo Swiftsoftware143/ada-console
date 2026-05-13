@@ -62,14 +62,15 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
       primary_color: "#007bff",
       enabled_profiles: DEFAULT_PROFILES,
       enabled_features: DEFAULT_FEATURES,
-      is_personal: isPersonal, // Flag to identify personal websites
     };
 
     const tableName = isPersonal ? "personal_websites" : "clients";
+    console.log("Inserting into", tableName, "payload:", payload);
     const { data, error } = await supabase
       .from(tableName)
       .insert(payload)
       .select();
+    console.log("Insert result:", { data, error });
 
     setSaving(false);
 
