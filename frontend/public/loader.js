@@ -1,14 +1,21 @@
 (function () {
   "use strict";
+  
+  console.log('[ADA] Loader starting...');
 
   /* ── CONFIG ────────────────────────────────────────────────────────────── */
   const SUPABASE_URL     = "https://fmwnswiwhgiofagqbkws.supabase.co"; // ← YOUR SUPABASE URL
   const SUPABASE_ANON    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtd25zd2l3aGdpb2ZhZ3Fia3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MzYwMDcsImV4cCI6MjA5NDExMjAwN30.ZlhvVGjfisF8P7tLCzCheHhgKwJjBT3S9E5gALv8ugU";               // ← YOUR ANON KEY
   const CURRENT_DOMAIN   = (document.currentScript && document.currentScript.getAttribute("data-domain"))
                            || window.location.hostname.replace(/^www\./, "");
+  
+  console.log('[ADA] Domain detected:', CURRENT_DOMAIN);
   /* ─────────────────────────────────────────────────────────────────────── */
 
-  if (!CURRENT_DOMAIN) return;
+  if (!CURRENT_DOMAIN) {
+    console.log('[ADA] No domain detected, exiting');
+    return;
+  }
 
   /* ── FETCH CLIENT CONFIG FROM SUPABASE ─────────────────────────────────── */
   // Try clients table first, then personal_websites
@@ -37,16 +44,24 @@
     }
   })
   .then(data => {
+    console.log('[ADA] Client data:', data);
     if (data && data.length) {
       const client = data[0];
-      if (!client.active) return;
+      console.log('[ADA] Client found:', client.name, 'Active:', client.active);
+      if (!client.active) {
+        console.log('[ADA] Client inactive, not loading widget');
+        return;
+      }
       injectWidget(client);
+    } else {
+      console.log('[ADA] No client found for domain:', CURRENT_DOMAIN);
     }
   })
   .catch(() => {}); /* Silent fail — never break the client's site */
 
   /* ── BUILD & INJECT WIDGET ─────────────────────────────────────────────── */
   function injectWidget(cfg) {
+    console.log('[ADA] Injecting widget for:', cfg.name);
     const AGENCY   = cfg.agency_name    || "SwiftImpact Solutions";
     const CTA_URL  = cfg.cta_url        || "https://swiftimpactsolutions.com/ada";
     const DOMAIN   = cfg.domain         || CURRENT_DOMAIN;
