@@ -34,6 +34,7 @@
   if (!CURRENT_DOMAIN) return;
 
   /* ── FETCH CLIENT CONFIG FROM SUPABASE ─────────────────────────────────── */
+  // Try clients table first, then personal_websites
   fetch(`${SUPABASE_URL}/rest/v1/clients?domain=eq.${encodeURIComponent(CURRENT_DOMAIN)}&select=*&limit=1`, {
     headers: {
       "apikey":        SUPABASE_ANON,
@@ -43,10 +44,27 @@
   })
   .then(r => r.json())
   .then(data => {
-    if (!data || !data.length) return; /* Domain not found — do nothing */
-    const client = data[0];
-    if (!client.active) return;        /* Widget is off — do nothing */
-    injectWidget(client);
+    if (data && data.length) {
+      const client = data[0];
+      if (!client.active) return;        /* Widget is off — do nothing */
+      injectWidget(client);
+    } else {
+      // Try personal_websites table
+      return fetch(`${SUPABASE_URL}/rest/v1/personal_websites?domain=eq.${encodeURIComponent(CURRENT_DOMAIN)}&select=*&limit=1`, {
+        headers: {
+          "apikey":        SUPABASE_ANON,
+          "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type":  "application/json"
+        }
+      }).then(r => r.json());
+    }
+  })
+  .then(data => {
+    if (data && data.length) {
+      const client = data[0];
+      if (!client.active) return;
+      injectWidget(client);
+    }
   })
   .catch(() => {}); /* Silent fail — never break the client's site */
 
