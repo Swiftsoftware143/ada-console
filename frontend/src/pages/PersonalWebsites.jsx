@@ -41,12 +41,18 @@ export default function PersonalWebsites() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    console.log("Loading personal websites...");
     const { data, error } = await supabase
       .from("personal_websites")
       .select("*")
       .order("created_at", { ascending: false });
-    if (error) toast.error(error.message);
-    else setWebsites(data || []);
+    if (error) {
+      console.error("Error loading personal websites:", error);
+      toast.error(error.message);
+    } else {
+      console.log("Loaded personal websites:", data?.length || 0, data);
+      setWebsites(data || []);
+    }
     setLoading(false);
   }, []);
 
