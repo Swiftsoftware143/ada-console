@@ -94,14 +94,13 @@
     /* ── STATE ──────────────────────────────────────────────────────────── */
     const S = {
       open: false, tab: "profiles",
-      epilepsy: !!PROFILES.epilepsy, cognitive: !!PROFILES.cognitive,
-      adhd: !!PROFILES.adhd, blindness: !!PROFILES.blindness, visImpaired: !!PROFILES.visImpaired,
+      epilepsy: false, cognitive: false, adhd: false, blindness: false, visImpaired: false,
       cursor: null, contrast: null, textAlign: null,
-      readableFont: !!FEATURES.readableFont, dyslexia: !!FEATURES.dyslexia,
-      highlightTitles: !!FEATURES.highlightTitles, highlightLinks: !!FEATURES.highlightLinks,
-      stopAnimations: !!FEATURES.stopAnimations, muteSounds: !!FEATURES.muteSounds,
-      hideImages: !!FEATURES.hideImages, virtualKeyboard: !!FEATURES.virtualKeyboard,
-      readingGuide: !!FEATURES.readingGuide, readingMask: !!FEATURES.readingMask,
+      readableFont: false, dyslexia: false,
+      highlightTitles: false, highlightLinks: false,
+      stopAnimations: false, muteSounds: false,
+      hideImages: false, virtualKeyboard: false,
+      readingGuide: false, readingMask: false,
       fontSize: 100, lineHeight: 100, letterSpacing: 0,
       textColor: "", titleColor: "", bgColor: "",
     };
