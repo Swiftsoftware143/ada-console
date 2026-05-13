@@ -31,7 +31,7 @@ const loadCategories = async () => {
       supabase.from("clients").select("category"),
       supabase.from("personal_websites").select("category"),
     ]);
-    const allCats = new Set();
+    const allCats = new Set(["Ecommerce", "Newsletters", "SaaS"]);
     [...(clients || []), ...(websites || [])].forEach(item => {
       if (item.category) allCats.add(item.category);
     });
