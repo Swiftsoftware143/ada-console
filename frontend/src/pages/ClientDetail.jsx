@@ -32,7 +32,7 @@ const hydrate = (data) => ({
   enabled_features: { ...DEFAULT_FEATURES, ...(data.enabled_features || {}) },
 });
 
-export default function ClientDetail() {
+export default function ClientDetail({ isPersonal = false }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [client, setClient] = useState(null);
@@ -45,7 +45,7 @@ export default function ClientDetail() {
     (async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from("clients")
+        .from(isPersonal ? "personal_websites" : "clients")
         .select("*")
         .eq("id", id)
         .maybeSingle();
@@ -107,7 +107,7 @@ export default function ClientDetail() {
       enabled_features: client.enabled_features,
     };
     const { data, error } = await supabase
-      .from("clients")
+      .from(isPersonal ? "personal_websites" : "clients")
       .update(payload)
       .eq("id", client.id)
       .select()
@@ -125,7 +125,7 @@ export default function ClientDetail() {
   const handleToggleActive = async (val) => {
     update({ active: val });
     const { error } = await supabase
-      .from("clients")
+      .from(isPersonal ? "personal_websites" : "clients")
       .update({ active: val })
       .eq("id", client.id);
     if (error) {
@@ -137,7 +137,7 @@ export default function ClientDetail() {
   };
 
   const handleDelete = async () => {
-    const { error } = await supabase.from("clients").delete().eq("id", client.id);
+    const { error } = await supabase.from(isPersonal ? "personal_websites" : "clients").delete().eq("id", client.id);
     if (error) {
       toast.error("Failed to delete");
       return;
@@ -159,7 +159,7 @@ export default function ClientDetail() {
       {/* Top bar */}
       <div className="flex items-center justify-between mb-6">
         <Link
-          to="/clients"
+          to={isPersonal ? "/personal-websites" : "/clients"}
           data-testid="back-to-clients-link"
           className="inline-flex items-center gap-1.5 text-sm text-[#94a3b8] hover:text-white transition-colors"
         >
