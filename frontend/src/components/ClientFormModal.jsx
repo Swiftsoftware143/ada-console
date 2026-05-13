@@ -164,20 +164,18 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
               <Label className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
                 Category
               </Label>
-              <Select
+              <Input
                 value={form.category}
-                onValueChange={(v) => setForm({ ...form, category: v })}
-              >
-                <SelectTrigger className="bg-[#0f1117] border-[#2e3245] text-white focus:ring-[#007bff]">
-                  <SelectValue placeholder="Select or type..." />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1e2130] border-[#2e3245] text-white">
-                  <SelectItem value="__none__">None</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                placeholder="Type new or existing category..."
+                list="category-suggestions"
+                className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
+              />
+              <datalist id="category-suggestions">
+                {categories.map((cat) => (
+                  <option key={cat} value={cat} />
+                ))}
+              </datalist>
             </div>
 
             <div className="space-y-1.5">
