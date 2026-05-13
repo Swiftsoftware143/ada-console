@@ -141,7 +141,7 @@ export default function PersonalWebsites() {
             {filteredSorted.map((c) => (
               <tr
                 key={c.id}
-                onClick={() => navigate(`/clients/${c.id}`)}
+                onClick={() => navigate(`/personal-websites/${c.id}`)}
                 data-testid={`client-row-${c.id}`}
                 className="border-t border-[#2e3245] hover:bg-[#1a1d27]/60 cursor-pointer transition-colors"
               >
@@ -163,7 +163,7 @@ export default function PersonalWebsites() {
                       testId={`edit-btn-${c.id}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/clients/${c.id}`);
+                        navigate(`/personal-websites/${c.id}`);
                       }}
                     >
                       <Pencil className="h-3.5 w-3.5" />
