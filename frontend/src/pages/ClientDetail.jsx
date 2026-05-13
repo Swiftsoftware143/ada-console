@@ -208,6 +208,26 @@ export default function ClientDetail({ isPersonal = false }) {
                 Stored cleanly on save (no https://, www., or trailing /).
               </p>
             </Field>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Category">
+                <Input
+                  data-testid="field-category"
+                  value={client.category || ""}
+                  onChange={(e) => update({ category: e.target.value })}
+                  placeholder="e.g., E-commerce, Local Business"
+                  className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
+                />
+              </Field>
+              <Field label="Location">
+                <Input
+                  data-testid="field-location"
+                  value={client.location || ""}
+                  onChange={(e) => update({ location: e.target.value })}
+                  placeholder="City, State"
+                  className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
+                />
+              </Field>
+            </div>
             <Field label="Plan Tier">
               <Select
                 value={client.plan_tier}
