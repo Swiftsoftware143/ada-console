@@ -23,6 +23,8 @@ import { supabase, DEFAULT_PROFILES, DEFAULT_FEATURES } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
+const NONE_VALUE = "__none__";
+
 const initialState = {
   name: "",
   domain: "",
@@ -79,7 +81,7 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
       name: form.name.trim(),
       domain: cleanDomain(form.domain),
       plan_tier: form.plan_tier,
-      category: form.category?.trim() || null,
+      category: form.category === NONE_VALUE ? null : form.category?.trim() || null,
       location: form.location?.trim() || null,
       notes: form.notes?.trim() || null,
       active: false,
