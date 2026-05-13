@@ -26,7 +26,19 @@ import MasterStatusHero from "@/components/MasterStatusHero";
 import EmbedCodeBlock from "@/components/EmbedCodeBlock";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
-const hydrate = (data) => ({
+const loadCategories = async () => {
+    const [{ data: clients }, { data: websites }] = await Promise.all([
+      supabase.from("clients").select("category"),
+      supabase.from("personal_websites").select("category"),
+    ]);
+    const allCats = new Set();
+    [...(clients || []), ...(websites || [])].forEach(item => {
+      if (item.category) allCats.add(item.category);
+    });
+    setCategories(Array.from(allCats).sort());
+  };
+
+  const hydrate = (data) => ({
   ...data,
   enabled_profiles: { ...DEFAULT_PROFILES, ...(data.enabled_profiles || {}) },
   enabled_features: { ...DEFAULT_FEATURES, ...(data.enabled_features || {}) },
@@ -39,6 +51,7 @@ export default function ClientDetail({ isPersonal = false }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     let alive = true;
@@ -56,6 +69,7 @@ export default function ClientDetail({ isPersonal = false }) {
         return;
       }
       setClient(hydrate(data));
+      loadCategories();
       setLoading(false);
     })();
     return () => {
@@ -123,6 +137,7 @@ export default function ClientDetail({ isPersonal = false }) {
     }
     console.log("Save response:", data);
     setClient(hydrate(data));
+      loadCategories();
     toast.success("Changes saved");
   };
 
@@ -219,8 +234,14 @@ export default function ClientDetail({ isPersonal = false }) {
                   value={client.category || ""}
                   onChange={(e) => update({ category: e.target.value })}
                   placeholder="e.g., E-commerce, Local Business"
+                  list="category-suggestions"
                   className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
                 />
+                <datalist id="category-suggestions">
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat} />
+                  ))}
+                </datalist>
               </Field>
               <Field label="Location">
                 <Input
