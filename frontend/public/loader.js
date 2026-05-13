@@ -268,7 +268,7 @@
     `;
 
     const CLOSE_IC = `<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>`;
-    const ACCESS_IC = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="4" r="2"/><path d="M19 9H5l2 9h10l2-9zM12 18v3m-3-6l-1 6m7-6l1 6" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>`;
+    const ACCESS_IC = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="4" r="2.5" fill="white"/><path d="M19 13v-2h-5.5l-.8-2.5c-.3-.8-1-1.3-1.8-1.3H9c-.8 0-1.5.5-1.8 1.2L5.5 13H3v2h3.5l1.7-5.2c.1-.3.4-.5.7-.5h1.5l.8 2.5c.3.8 1 1.3 1.8 1.3H19v5h-3v2h3c1.1 0 2-.9 2-2v-5c0-1.1-.9-2-2-2z" fill="white"/><path d="M7 17.5c0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5-2-4.5-4.5-4.5S7 15 7 17.5zm7 0c0 1.4-1.1 2.5-2.5 2.5S9 18.9 9 17.5s1.1-2.5 2.5-2.5 2.5 1.1 2.5 2.5z" fill="white"/></svg>`;
 
     const tmpl = document.createElement("template");
     tmpl.innerHTML = `
