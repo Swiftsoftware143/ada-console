@@ -325,11 +325,11 @@
     <div class="aw-pane active" data-pane="profiles">
       <p class="aw-section-label">Disability Profiles</p>
       <div class="aw-profiles">
-        <button class="aw-profile-btn${PROFILES.epilepsy?' active':''}" data-profile="epilepsy"><span class="icon">⚡</span><span class="info"><strong>Epilepsy Safe</strong><span>Stops flashing animations & flickering content.</span></span></button>
-        <button class="aw-profile-btn${PROFILES.cognitive?' active':''}" data-profile="cognitive"><span class="icon">🧩</span><span class="info"><strong>Cognitive Disability</strong><span>Simplifies layout and boosts readability.</span></span></button>
-        <button class="aw-profile-btn${PROFILES.adhd?' active':''}" data-profile="adhd"><span class="icon">🎯</span><span class="info"><strong>ADHD Friendly</strong><span>Highlights focus areas, reduces distractions.</span></span></button>
-        <button class="aw-profile-btn${PROFILES.blindness?' active':''}" data-profile="blindness"><span class="icon">🦯</span><span class="info"><strong>Blindness Mode</strong><span>Optimizes for screen readers.</span></span></button>
-        <button class="aw-profile-btn${PROFILES.visImpaired?' active':''}" data-profile="visImpaired"><span class="icon">👁️</span><span class="info"><strong>Visually Impaired</strong><span>Large text, high contrast, magnified cursor.</span></span></button>
+        ${PROFILES.epilepsy?'<button class="aw-profile-btn" data-profile="epilepsy"><span class="icon">⚡</span><span class="info"><strong>Epilepsy Safe</strong><span>Stops flashing animations & flickering content.</span></span></button>':''}
+        ${PROFILES.cognitive?'<button class="aw-profile-btn" data-profile="cognitive"><span class="icon">🧩</span><span class="info"><strong>Cognitive Disability</strong><span>Simplifies layout and boosts readability.</span></span></button>':''}
+        ${PROFILES.adhd?'<button class="aw-profile-btn" data-profile="adhd"><span class="icon">🎯</span><span class="info"><strong>ADHD Friendly</strong><span>Highlights focus areas, reduces distractions.</span></span></button>':''}
+        ${PROFILES.blindness?'<button class="aw-profile-btn" data-profile="blindness"><span class="icon">🦯</span><span class="info"><strong>Blindness Mode</strong><span>Optimizes for screen readers.</span></span></button>':''}
+        ${PROFILES.visImpaired?'<button class="aw-profile-btn" data-profile="visImpaired"><span class="icon">👁️</span><span class="info"><strong>Visually Impaired</strong><span>Large text, high contrast, magnified cursor.</span></span></button>':''}
       </div>
     </div>
     <div class="aw-pane" data-pane="content">
@@ -337,17 +337,17 @@
       <div class="aw-grid">
         <button class="aw-btn" data-toggle="cursor" data-val="black"><span class="bicon">🖱️</span>Big Black Cursor</button>
         <button class="aw-btn" data-toggle="cursor" data-val="white"><span class="bicon">🖱️</span>Big White Cursor</button>
-        <button class="aw-btn${FEATURES.readingGuide?' active':''}" data-toggle="readingGuide"><span class="bicon">📏</span>Reading Guide</button>
-        <button class="aw-btn${FEATURES.readingMask?' active':''}" data-toggle="readingMask"><span class="bicon">🎭</span>Reading Mask</button>
+        ${FEATURES.readingGuide?'<button class="aw-btn" data-toggle="readingGuide"><span class="bicon">📏</span>Reading Guide</button>':''}
+        ${FEATURES.readingMask?'<button class="aw-btn" data-toggle="readingMask"><span class="bicon">🎭</span>Reading Mask</button>':''}
       </div>
       <p class="aw-section-label">Content Tools</p>
       <div class="aw-grid">
-        <button class="aw-btn${FEATURES.readableFont?' active':''}" data-toggle="readableFont"><span class="bicon">🔤</span>Readable Font</button>
-        <button class="aw-btn${FEATURES.dyslexia?' active':''}" data-toggle="dyslexia"><span class="bicon">📖</span>Dyslexia Friendly</button>
-        <button class="aw-btn${FEATURES.highlightTitles?' active':''}" data-toggle="highlightTitles"><span class="bicon">🔆</span>Highlight Titles</button>
-        <button class="aw-btn${FEATURES.highlightLinks?' active':''}" data-toggle="highlightLinks"><span class="bicon">🔗</span>Highlight Links</button>
-        <button class="aw-btn${FEATURES.stopAnimations?' active':''}" data-toggle="stopAnimations"><span class="bicon">⏸️</span>Stop Animations</button>
-        <button class="aw-btn${FEATURES.muteSounds?' active':''}" data-toggle="muteSounds"><span class="bicon">🔇</span>Mute Sounds</button>
+        ${FEATURES.readableFont?'<button class="aw-btn" data-toggle="readableFont"><span class="bicon">🔤</span>Readable Font</button>':''}
+        ${FEATURES.dyslexia?'<button class="aw-btn" data-toggle="dyslexia"><span class="bicon">📖</span>Dyslexia Friendly</button>':''}
+        ${FEATURES.highlightTitles?'<button class="aw-btn" data-toggle="highlightTitles"><span class="bicon">🔆</span>Highlight Titles</button>':''}
+        ${FEATURES.highlightLinks?'<button class="aw-btn" data-toggle="highlightLinks"><span class="bicon">🔗</span>Highlight Links</button>':''}
+        ${FEATURES.stopAnimations?'<button class="aw-btn" data-toggle="stopAnimations"><span class="bicon">⏸️</span>Stop Animations</button>':''}
+        ${FEATURES.muteSounds?'<button class="aw-btn" data-toggle="muteSounds"><span class="bicon">🔇</span>Mute Sounds</button>':''}
         <button class="aw-btn${FEATURES.hideImages?' active':''}" data-toggle="hideImages"><span class="bicon">🚫</span>Hide Images</button>
         <button class="aw-btn${FEATURES.virtualKeyboard?' active':''}" data-toggle="virtualKeyboard"><span class="bicon">⌨️</span>Virtual Keyboard</button>
       </div>
