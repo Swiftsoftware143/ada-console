@@ -27,15 +27,19 @@ import EmbedCodeBlock from "@/components/EmbedCodeBlock";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
 const loadCategories = async () => {
+    console.log("Loading categories...");
     const [{ data: clients }, { data: websites }] = await Promise.all([
       supabase.from("clients").select("category"),
       supabase.from("personal_websites").select("category"),
     ]);
+    console.log("Loaded clients:", clients?.length, "websites:", websites?.length);
     const allCats = new Set(["Ecommerce", "Newsletters", "SaaS"]);
     [...(clients || []), ...(websites || [])].forEach(item => {
       if (item.category) allCats.add(item.category);
     });
-    setCategories(Array.from(allCats).sort());
+    const sortedCats = Array.from(allCats).sort();
+    console.log("Categories set:", sortedCats);
+    setCategories(sortedCats);
   };
 
   const hydrate = (data) => ({
