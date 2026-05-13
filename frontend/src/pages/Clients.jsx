@@ -10,20 +10,34 @@ import {
   ArrowUp,
   ArrowDown,
   Inbox,
+  Tag,
+  MapPin,
+  Filter,
+  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { formatDate, sortByKey, filterClients } from "@/lib/helpers";
+import { formatDate, sortByKey } from "@/lib/helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import StatusBadge from "@/components/StatusBadge";
 import PageHeader from "@/components/PageHeader";
 import ClientFormModal from "@/components/ClientFormModal";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import CategoryManager from "@/components/CategoryManager";
 import { toast } from "sonner";
 
 const COLUMNS = [
   { key: "name", label: "Client Name" },
   { key: "domain", label: "Domain" },
+  { key: "category", label: "Category" },
+  { key: "location", label: "Location" },
   { key: "plan_tier", label: "Plan Tier" },
   { key: "active", label: "Status" },
   { key: "created_at", label: "Date Added" },
@@ -33,11 +47,33 @@ export default function Clients() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [categories, setCategories] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [sortKey, setSortKey] = useState("created_at");
   const [sortDir, setSortDir] = useState("desc");
   const [addOpen, setAddOpen] = useState(false);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [toDelete, setToDelete] = useState(null);
   const navigate = useNavigate();
+
+  const loadFilters = useCallback(async () => {
+    const [{ data: clientsData }, { data: websitesData }] = await Promise.all([
+      supabase.from("clients").select("category,location"),
+      supabase.from("personal_websites").select("category,location"),
+    ]);
+    
+    const allCats = new Set();
+    const allLocs = new Set();
+    [...(clientsData || []), ...(websitesData || [])].forEach(item => {
+      if (item.category) allCats.add(item.category);
+      if (item.location) allLocs.add(item.location);
+    });
+    
+    setCategories(Array.from(allCats).sort());
+    setLocations(Array.from(allLocs).sort());
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,7 +90,8 @@ export default function Clients() {
       setClients(data || []);
     }
     setLoading(false);
-  }, []);
+    loadFilters();
+  }, [loadFilters]);
 
   useEffect(() => {
     load();
@@ -87,6 +124,7 @@ export default function Clients() {
     toast.success(`${toDelete.name} deleted`);
     setClients((prev) => prev.filter((c) => c.id !== toDelete.id));
     setToDelete(null);
+    loadFilters();
   };
 
   const handleSort = (key) => {
@@ -98,10 +136,35 @@ export default function Clients() {
     }
   };
 
+  const filteredClients = useMemo(() => {
+    return clients.filter((c) => {
+      const matchesSearch =
+        search === "" ||
+        c.name?.toLowerCase().includes(search.toLowerCase()) ||
+        c.domain?.toLowerCase().includes(search.toLowerCase()) ||
+        c.plan_tier?.toLowerCase().includes(search.toLowerCase()) ||
+        c.category?.toLowerCase().includes(search.toLowerCase()) ||
+        c.location?.toLowerCase().includes(search.toLowerCase());
+      
+      const matchesCategory = categoryFilter === "all" || c.category === categoryFilter;
+      const matchesLocation = locationFilter === "all" || c.location === locationFilter;
+      
+      return matchesSearch && matchesCategory && matchesLocation;
+    });
+  }, [clients, search, categoryFilter, locationFilter]);
+
   const filteredSorted = useMemo(
-    () => sortByKey(filterClients(clients, search), sortKey, sortDir),
-    [clients, search, sortKey, sortDir]
+    () => sortByKey(filteredClients, sortKey, sortDir),
+    [filteredClients, sortKey, sortDir]
   );
+
+  const clearFilters = () => {
+    setCategoryFilter("all");
+    setLocationFilter("all");
+    setSearch("");
+  };
+
+  const hasFilters = categoryFilter !== "all" || locationFilter !== "all" || search !== "";
 
   const renderTable = () => {
     if (loading) {
@@ -113,7 +176,15 @@ export default function Clients() {
     if (filteredSorted.length === 0) {
       return (
         <div className="p-10 text-center text-[#64748b] text-sm" data-testid="clients-no-results">
-          No clients match &ldquo;{search}&rdquo;
+          No clients match your filters
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="ml-2 text-[#007bff] hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       );
     }
@@ -147,6 +218,26 @@ export default function Clients() {
               >
                 <td className="px-6 py-4 text-white font-medium">{c.name}</td>
                 <td className="px-6 py-4 text-[#94a3b8] font-mono text-xs">{c.domain}</td>
+                <td className="px-6 py-4">
+                  {c.category ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#007bff]/10 text-[#007bff] text-xs">
+                      <Tag className="h-3 w-3" />
+                      {c.category}
+                    </span>
+                  ) : (
+                    <span className="text-[#64748b] text-xs">-</span>
+                  )}
+                </td>
+                <td className="px-6 py-4">
+                  {c.location ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#10b981]/10 text-[#10b981] text-xs">
+                      <MapPin className="h-3 w-3" />
+                      {c.location}
+                    </span>
+                  ) : (
+                    <span className="text-[#64748b] text-xs">-</span>
+                  )}
+                </td>
                 <td className="px-6 py-4">
                   <span className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8]">
                     {c.plan_tier}
@@ -208,31 +299,83 @@ export default function Clients() {
         title="Clients"
         subtitle="Manage every client deploying the SwiftImpact ADA widget."
         actions={
-          <Button
-            data-testid="add-new-client-btn"
-            onClick={() => setAddOpen(true)}
-            className="bg-[#007bff] hover:bg-[#0056b3] text-white shadow-[0_0_15px_rgba(0,123,255,0.25)] hover:shadow-[0_0_22px_rgba(0,123,255,0.45)] transition-shadow"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add new client
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCategoryManagerOpen(true)}
+              className="border-[#2e3245] text-[#94a3b8] hover:text-white hover:border-[#3e445e]"
+            >
+              <Tag className="h-4 w-4 mr-2" />
+              Categories
+            </Button>
+            <Button
+              data-testid="add-new-client-btn"
+              onClick={() => setAddOpen(true)}
+              className="bg-[#007bff] hover:bg-[#0056b3] text-white shadow-[0_0_15px_rgba(0,123,255,0.25)] hover:shadow-[0_0_22px_rgba(0,123,255,0.45)] transition-shadow"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add new client
+            </Button>
+          </div>
         }
       />
 
       <div className="bg-[#1e2130] border border-[#2e3245] rounded-xl">
-        <div className="px-6 py-4 border-b border-[#2e3245] flex items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b] pointer-events-none" />
-            <Input
-              data-testid="clients-search-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search clients, domains, plans..."
-              className="pl-9 bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
-            />
+        <div className="px-6 py-4 border-b border-[#2e3245] space-y-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b] pointer-events-none" />
+              <Input
+                data-testid="clients-search-input"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search clients, domains, plans..."
+                className="pl-9 bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
+              />
+            </div>
+            
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[160px] bg-[#0f1117] border-[#2e3245] text-white">
+                <Tag className="h-4 w-4 mr-2 text-[#64748b]" />
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1e2130] border-[#2e3245]">
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger className="w-[160px] bg-[#0f1117] border-[#2e3245] text-white">
+                <MapPin className="h-4 w-4 mr-2 text-[#64748b]" />
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1e2130] border-[#2e3245]">
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map((loc) => (
+                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {hasFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="text-[#64748b] hover:text-white"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
           </div>
+          
           <div className="text-xs text-[#64748b]" data-testid="clients-count">
             {filteredSorted.length} {filteredSorted.length === 1 ? "client" : "clients"}
+            {hasFilters && ` (filtered from ${clients.length})`}
           </div>
         </div>
 
@@ -240,6 +383,11 @@ export default function Clients() {
       </div>
 
       <ClientFormModal open={addOpen} onOpenChange={setAddOpen} onCreated={() => { console.log("Client created, refreshing..."); load(); }} />
+      <CategoryManager 
+        open={categoryManagerOpen} 
+        onOpenChange={setCategoryManagerOpen} 
+        onCategoriesChange={loadFilters}
+      />
       <DeleteConfirmModal
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}
@@ -295,4 +443,3 @@ function ClientsEmptyState({ onAdd }) {
     </div>
   );
 }
-
