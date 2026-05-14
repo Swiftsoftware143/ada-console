@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ArrowLeft, Loader2, Save, Trash2, Tag } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, Tag, Search, X } from "lucide-react";
 import {
   supabase,
   PROFILE_LABELS,
@@ -42,6 +42,8 @@ export default function ClientDetail({ isPersonal = false }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [categories, setCategories] = useState(["Ecommerce", "Newsletters", "SaaS"]);
+  const [profileFilter, setProfileFilter] = useState("");
+  const [featureFilter, setFeatureFilter] = useState("");
 
   const loadCategories = useCallback(async () => {
     try {
@@ -343,31 +345,79 @@ export default function ClientDetail({ isPersonal = false }) {
 
           {/* Section 3: Profiles */}
           <Section title="Default Profiles" testId="section-profiles" subtitle="Select which profile buttons appear in the widget. All features start OFF.">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {Object.entries(PROFILE_LABELS).map(([key, label]) => (
-                <ToggleRow
-                  key={key}
-                  label={label}
-                  testId={`profile-${key}`}
-                  checked={!!client.enabled_profiles[key]}
-                  onChange={(v) => updateProfile(key, v)}
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b] pointer-events-none" />
+                <Input
+                  value={profileFilter}
+                  onChange={(e) => setProfileFilter(e.target.value)}
+                  placeholder="Filter profiles..."
+                  className="pl-9 pr-9 bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
                 />
-              ))}
+                {profileFilter && (
+                  <button
+                    onClick={() => setProfileFilter("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {Object.entries(PROFILE_LABELS)
+                .filter(([key, label]) =>
+                  label.toLowerCase().includes(profileFilter.toLowerCase()) ||
+                  key.toLowerCase().includes(profileFilter.toLowerCase())
+                )
+                .map(([key, label]) => (
+                  <ToggleRow
+                    key={key}
+                    label={label}
+                    testId={`profile-${key}`}
+                    checked={!!client.enabled_profiles[key]}
+                    onChange={(v) => updateProfile(key, v)}
+                  />
+                ))}
             </div>
           </Section>
 
           {/* Section 4: Features */}
           <Section title="Default Features" testId="section-features" subtitle="Select which feature buttons appear in the widget. All features start OFF.">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {Object.entries(FEATURE_LABELS).map(([key, label]) => (
-                <ToggleRow
-                  key={key}
-                  label={label}
-                  testId={`feature-${key}`}
-                  checked={!!client.enabled_features[key]}
-                  onChange={(v) => updateFeature(key, v)}
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b] pointer-events-none" />
+                <Input
+                  value={featureFilter}
+                  onChange={(e) => setFeatureFilter(e.target.value)}
+                  placeholder="Filter features..."
+                  className="pl-9 pr-9 bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
                 />
-              ))}
+                {featureFilter && (
+                  <button
+                    onClick={() => setFeatureFilter("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {Object.entries(FEATURE_LABELS)
+                .filter(([key, label]) =>
+                  label.toLowerCase().includes(featureFilter.toLowerCase()) ||
+                  key.toLowerCase().includes(featureFilter.toLowerCase())
+                )
+                .map(([key, label]) => (
+                  <ToggleRow
+                    key={key}
+                    label={label}
+                    testId={`feature-${key}`}
+                    checked={!!client.enabled_features[key]}
+                    onChange={(v) => updateFeature(key, v)}
+                  />
+                ))}
             </div>
           </Section>
         </div>
