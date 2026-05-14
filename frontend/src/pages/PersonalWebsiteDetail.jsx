@@ -79,7 +79,7 @@ export default function PersonalWebsiteDetail() {
     return () => {
       alive = false;
     };
-  }, [id, navigate]);
+  }, [id, navigate, loadCategories]);
 
   const update = useCallback(
     (patch) => setWebsite((w) => ({ ...w, ...patch })),

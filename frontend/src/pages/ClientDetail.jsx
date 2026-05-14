@@ -79,7 +79,7 @@ export default function ClientDetail({ isPersonal = false }) {
     return () => {
       alive = false;
     };
-  }, [id, navigate, isPersonal]);
+  }, [id, navigate, isPersonal, loadCategories]);
 
   const update = useCallback(
     (patch) => setClient((c) => ({ ...c, ...patch })),
