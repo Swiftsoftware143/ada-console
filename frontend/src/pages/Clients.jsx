@@ -14,6 +14,7 @@ import {
   MapPin,
   Filter,
   X,
+  Activity,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDate, sortByKey } from "@/lib/helpers";
@@ -49,6 +50,7 @@ export default function Clients() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
   const [sortKey, setSortKey] = useState("created_at");
@@ -148,10 +150,13 @@ export default function Clients() {
       
       const matchesCategory = categoryFilter === "all" || c.category === categoryFilter;
       const matchesLocation = locationFilter === "all" || c.location === locationFilter;
+      const matchesStatus = statusFilter === "all" || 
+        (statusFilter === "active" && c.active) || 
+        (statusFilter === "inactive" && !c.active);
       
-      return matchesSearch && matchesCategory && matchesLocation;
+      return matchesSearch && matchesCategory && matchesLocation && matchesStatus;
     });
-  }, [clients, search, categoryFilter, locationFilter]);
+  }, [clients, search, categoryFilter, locationFilter, statusFilter]);
 
   const filteredSorted = useMemo(
     () => sortByKey(filteredClients, sortKey, sortDir),
@@ -161,10 +166,11 @@ export default function Clients() {
   const clearFilters = () => {
     setCategoryFilter("all");
     setLocationFilter("all");
+    setStatusFilter("all");
     setSearch("");
   };
 
-  const hasFilters = categoryFilter !== "all" || locationFilter !== "all" || search !== "";
+  const hasFilters = categoryFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || search !== "";
 
   const renderTable = () => {
     if (loading) {
@@ -357,6 +363,18 @@ export default function Clients() {
                 {locations.map((loc) => (
                   <SelectItem key={loc} value={loc}>{loc}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px] bg-[#0f1117] border-[#2e3245] text-white">
+                <Activity className="h-4 w-4 mr-2 text-[#64748b]" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1e2130] border-[#2e3245]">
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
             
