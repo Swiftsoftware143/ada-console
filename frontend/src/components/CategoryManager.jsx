@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Plus, Tag } from "lucide-react";
+import { Trash2, Plus, Tag, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
@@ -16,6 +16,7 @@ export default function CategoryManager({ open, onOpenChange, onCategoriesChange
   const [categories, setCategories] = useState([]);
   const [newCategory, setNewCategory] = useState("");
   const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     if (open) loadCategories();
@@ -37,20 +38,49 @@ export default function CategoryManager({ open, onOpenChange, onCategoriesChange
     setLoading(false);
   };
 
-  const addCategory = () => {
+  const addCategory = async () => {
     if (!newCategory.trim()) {
       toast.error("Category name is required");
       return;
     }
     
-    if (categories.includes(newCategory.trim())) {
+    const trimmed = newCategory.trim();
+    
+    if (categories.includes(trimmed)) {
       toast.error("Category already exists");
       return;
     }
     
-    setCategories([...categories, newCategory.trim()].sort());
+    setAdding(true);
+    
+    // Add category by creating a temporary client with that category
+    // This ensures the category exists in the system
+    const { error } = await supabase
+      .from("clients")
+      .insert({
+        name: "_category_placeholder_",
+        domain: "_placeholder_.com",
+        category: trimmed,
+        active: false,
+        plan_tier: "basic"
+      });
+    
+    if (error) {
+      toast.error("Failed to add category");
+      setAdding(false);
+      return;
+    }
+    
+    // Delete the placeholder
+    await supabase
+      .from("clients")
+      .delete()
+      .eq("domain", "_placeholder_.com");
+    
+    setCategories([...categories, trimmed].sort());
     setNewCategory("");
-    toast.success("Category added");
+    setAdding(false);
+    toast.success(`Category "${trimmed}" added`);
     if (onCategoriesChange) onCategoriesChange();
   };
 
@@ -72,14 +102,14 @@ export default function CategoryManager({ open, onOpenChange, onCategoriesChange
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="bg-[#1e2130] border border-[#2e3245] text-white sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Tag className="h-5 w-5" />
+          <DialogTitle className="flex items-center gap-2 text-xl tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
+            <Tag className="h-5 w-5 text-[#007bff]" />
             Manage Categories
           </DialogTitle>
-          <DialogDescription>
-            Add or remove categories. Removing a category will unassign it from all websites.
+          <DialogDescription className="text-[#94a3b8]">
+            Add or remove categories. Removing a category will unassign it from all clients and websites.
           </DialogDescription>
         </DialogHeader>
         
@@ -89,29 +119,35 @@ export default function CategoryManager({ open, onOpenChange, onCategoriesChange
               placeholder="New category name..."
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addCategory()}
+              onKeyDown={(e) => e.key === "Enter" && !adding && addCategory()}
+              className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
             />
-            <Button onClick={addCategory} size="icon">
-              <Plus className="h-4 w-4" />
+            <Button 
+              onClick={addCategory} 
+              size="icon"
+              disabled={adding}
+              className="bg-[#007bff] hover:bg-[#0056b3] text-white"
+            >
+              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             </Button>
           </div>
           
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {loading ? (
-              <p className="text-sm text-muted-foreground">Loading...</p>
+              <p className="text-sm text-[#64748b]">Loading...</p>
             ) : categories.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No categories yet</p>
+              <p className="text-sm text-[#64748b]">No categories yet</p>
             ) : (
               categories.map((category) => (
                 <div
                   key={category}
-                  className="flex items-center justify-between p-2 rounded-md border bg-card"
+                  className="flex items-center justify-between p-3 rounded-lg border border-[#2e3245] bg-[#0f1117] hover:border-[#3e445e] transition-colors"
                 >
-                  <span className="text-sm">{category}</span>
+                  <span className="text-sm text-white font-medium">{category}</span>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    className="h-8 w-8 text-[#ef4444] hover:text-[#ef4444] hover:bg-[#ef4444]/10"
                     onClick={() => deleteCategory(category)}
                   >
                     <Trash2 className="h-4 w-4" />
