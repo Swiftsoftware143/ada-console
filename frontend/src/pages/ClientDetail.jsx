@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ArrowLeft, Loader2, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, Tag } from "lucide-react";
 import {
   supabase,
   PROFILE_LABELS,
@@ -25,6 +25,7 @@ import {
 import MasterStatusHero from "@/components/MasterStatusHero";
 import EmbedCodeBlock from "@/components/EmbedCodeBlock";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import CategoryManager from "@/components/CategoryManager";
 
 const hydrate = (data) => ({
   ...data,
@@ -39,6 +40,7 @@ export default function ClientDetail({ isPersonal = false }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [categories, setCategories] = useState(["Ecommerce", "Newsletters", "SaaS"]);
 
   const loadCategories = useCallback(async () => {
@@ -188,15 +190,25 @@ export default function ClientDetail({ isPersonal = false }) {
         >
           <ArrowLeft className="h-4 w-4" /> Back to clients
         </Link>
-        <Button
-          variant="ghost"
-          data-testid="header-delete-btn"
-          onClick={() => setDeleteOpen(true)}
-          className="text-[#ef4444] hover:text-[#ef4444] hover:bg-[#ef4444]/10"
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Delete client
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setCategoryManagerOpen(true)}
+            className="border-[#2e3245] text-[#94a3b8] hover:text-white hover:border-[#3e445e]"
+          >
+            <Tag className="h-4 w-4 mr-2" />
+            Categories
+          </Button>
+          <Button
+            variant="ghost"
+            data-testid="header-delete-btn"
+            onClick={() => setDeleteOpen(true)}
+            className="text-[#ef4444] hover:text-[#ef4444] hover:bg-[#ef4444]/10"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete client
+          </Button>
+        </div>
       </div>
 
       {/* Master toggle hero */}
@@ -404,6 +416,12 @@ export default function ClientDetail({ isPersonal = false }) {
         onOpenChange={setDeleteOpen}
         onConfirm={handleDelete}
         clientName={client.name}
+      />
+
+      <CategoryManager
+        open={categoryManagerOpen}
+        onOpenChange={setCategoryManagerOpen}
+        onCategoriesChange={loadCategories}
       />
     </div>
   );
