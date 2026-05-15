@@ -13,7 +13,7 @@ import StatusBadge from "@/components/StatusBadge";
 const NOCODEBACKEND_API_KEY = '3a8c4c52bfafbe26fe25ca473f8a25bbea6c66448a6dfef2bab6fe8a67ef';
 const NOCODEBACKEND_BASE = 'https://openapi.nocodebackend.com';
 const INSTANCE = '54738_ada_swift';
-const WEBHOOK_SERVER = 'http://localhost:3459';
+const WEBHOOK_SERVER = 'https://b0ea-187-124-147-183.ngrok-free.app';
 
 export default function WidgetRequests() {
   // Widget Requests page - NoCodeBackend integration
