@@ -101,7 +101,17 @@ export default function WidgetRequests() {
         body: JSON.stringify(submitData)
       });
 
-      const result = await response.json();
+      // Clone response before reading to avoid "body stream already read" error
+      const responseClone = response.clone();
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        // If JSON parse fails, try to get text from clone
+        const text = await responseClone.text();
+        console.error('Response parse error:', text);
+        throw new Error('Failed to parse server response');
+      }
 
       if (result.success) {
         setMessage({ 
