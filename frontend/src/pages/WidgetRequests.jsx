@@ -13,6 +13,11 @@ const NOCODEBACKEND_API_KEY = '3a8c4c52bfafbe26fe25ca473f8a25bbea6c66448a6dfef2b
 const NOCODEBACKEND_BASE = 'https://openapi.nocodebackend.com';
 const INSTANCE = '54738_ada_swift';
 
+// Sendiio Config
+const SENDIIO_TOKEN = '7dc822e4ae6bc57f301ea4d82f0b8425f3a1ca60';
+const SENDIIO_SECRET = 'XCY6JwIZ3Q8MUsyFfbinu9DH2VtB7LWEPRqKcNe0P3TubKRxqkVMtIJjN9lsdreA671UypQgn0WzDXHL';
+const SENDIIO_BASE = 'https://sendiio.com/api/v1';
+
 export default function WidgetRequests() {
   const [widgets, setWidgets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -187,7 +192,76 @@ export default function WidgetRequests() {
       console.log('Response status:', response.status);
 
       if (response.ok) {
-        setMessage({ type: 'success', text: 'Widget delivered! Embed code generated.' });
+        // Send email via Sendiio
+        try {
+          const emailHtml = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:#4ade80;color:white;padding:20px;text-align:center;border-radius:8px 8px 0 0;">
+    <h1>♿ ADA Swift</h1><p>Your Widget is Ready!</p>
+  </div>
+  <div style="background:#f8f9fa;padding:30px;border-radius:0 0 8px 8px;">
+    <p>Hi ${widget.contact_name},</p>
+    <p>Your ADA compliance widget for <strong>${widget.domain}</strong> is ready!</p>
+    <p><strong>Plan:</strong> ${(widget.plan_tier || 'basic').toUpperCase()}<br>
+    <strong>Widget ID:</strong> ${widget.widget_id}</p>
+    <h3>Your Embed Code:</h3>
+    <div style="background:#1e293b;color:#4ade80;padding:15px;border-radius:4px;font-family:monospace;font-size:13px;overflow-x:auto;">${embedCode.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+    <p><strong>Installation:</strong></p>
+    <ol><li>Copy the code above</li><li>Paste before the &lt;/body&gt; tag on your website</li><li>Save and publish</li></ol>
+    <p>Need help? Reply to this email.</p>
+    <p>Best,<br>SwiftImpact Solutions Team</p>
+  </div>
+</body>
+</html>`;
+
+          const emailText = `Hi ${widget.contact_name},
+
+Your ADA compliance widget for ${widget.domain} is ready!
+
+Plan: ${(widget.plan_tier || 'basic').toUpperCase()}
+Widget ID: ${widget.widget_id}
+
+EMBED CODE:
+${embedCode}
+
+Installation:
+1. Copy the code above
+2. Paste before </body> tag on your website
+3. Save and publish
+
+Need help? Reply to this email.
+
+Best,
+SwiftImpact Solutions Team`;
+
+          const emailResponse = await fetch(`${SENDIIO_BASE}/email/send`, {
+            method: 'POST',
+            headers: {
+              'token': SENDIIO_TOKEN,
+              'secret': SENDIIO_SECRET,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              to: widget.contact_email,
+              from: 'hello@swiftimpactsolutions.com',
+              from_name: 'SwiftImpact Solutions',
+              subject: `Your ADA Widget is Ready - ${widget.business_name}`,
+              html: emailHtml,
+              text: emailText
+            })
+          });
+
+          if (emailResponse.ok) {
+            setMessage({ type: 'success', text: 'Widget delivered and email sent!' });
+          } else {
+            setMessage({ type: 'warning', text: 'Widget delivered but email failed.' });
+          }
+        } catch (emailError) {
+          console.error('Email error:', emailError);
+          setMessage({ type: 'warning', text: 'Widget delivered but email failed.' });
+        }
         loadWidgets();
       } else {
         console.error('Deliver failed with status:', response.status);

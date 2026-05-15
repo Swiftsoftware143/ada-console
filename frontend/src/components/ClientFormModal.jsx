@@ -28,6 +28,7 @@ const initialState = {
   domain: "",
   plan_tier: "basic",
   category: "",
+  tags: [],
   location: "",
   notes: "",
 };
@@ -35,6 +36,8 @@ const initialState = {
 export default function ClientFormModal({ open, onOpenChange, onCreated, isPersonal = false }) {
   const [form, setForm] = useState(initialState);
   const [categories, setCategories] = useState([]);
+  const [availableTags, setAvailableTags] = useState([]);
+  const [tagInput, setTagInput] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -46,16 +49,27 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
 
   const loadCategories = async () => {
     const [{ data: clients }, { data: websites }] = await Promise.all([
-      supabase.from("clients").select("category"),
-      supabase.from("personal_websites").select("category"),
+      supabase.from("clients").select("category,tags"),
+      supabase.from("personal_websites").select("category,tags"),
     ]);
     
     const allCategories = new Set();
+    const allTags = new Set();
+    
     [...(clients || []), ...(websites || [])].forEach(item => {
       if (item.category) allCategories.add(item.category);
+      // Handle both array and comma-separated string formats
+      if (item.tags) {
+        if (Array.isArray(item.tags)) {
+          item.tags.forEach(tag => allTags.add(tag));
+        } else if (typeof item.tags === 'string') {
+          item.tags.split(',').forEach(tag => allTags.add(tag.trim()));
+        }
+      }
     });
     
     setCategories(Array.from(allCategories).sort());
+    setAvailableTags(Array.from(allTags).sort());
   };
 
   const handleSubmit = async (e) => {
@@ -70,11 +84,18 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
     }
 
     setSaving(true);
+    // Combine category and tags - store as comma-separated in category field
+    // or use tags array if the column exists
+    const combinedTags = form.tags.length > 0 
+      ? (form.category ? [form.category, ...form.tags] : form.tags).join(', ')
+      : form.category;
+    
     const payload = {
       name: form.name.trim(),
       domain: cleanDomain(form.domain),
       plan_tier: form.plan_tier,
-      category: form.category || null,
+      category: combinedTags || null,
+      tags: form.tags.length > 0 ? form.tags : null,
       location: form.location.trim() || null,
       notes: form.notes.trim() || null,
       active: false,
@@ -189,6 +210,69 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
                 className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
               />
             </div>
+          </div>
+
+          {/* Tags Section */}
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
+              Tags (Industry/Type)
+            </Label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {form.tags.map((tag, idx) => (
+                <span 
+                  key={idx} 
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-[#007bff]/20 text-[#007bff] rounded text-xs"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, tags: form.tags.filter((_, i) => i !== idx) })}
+                    className="hover:text-white"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
+                      setForm({ ...form, tags: [...form.tags, tagInput.trim()] });
+                      setTagInput("");
+                    }
+                  }
+                }}
+                placeholder="Type tag and press Enter..."
+                list="tag-suggestions"
+                className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
+                    setForm({ ...form, tags: [...form.tags, tagInput.trim()] });
+                    setTagInput("");
+                  }
+                }}
+                className="bg-transparent border-[#2e3245] text-white hover:bg-[#1a1d27]"
+              >
+                Add
+              </Button>
+            </div>
+            <datalist id="tag-suggestions">
+              {availableTags.map((tag) => (
+                <option key={tag} value={tag} />
+              ))}
+            </datalist>
+            <p className="text-xs text-[#64748b]">
+              Add multiple tags to categorize by industry, business type, etc.
+            </p>
           </div>
 
           <div className="space-y-1.5">
