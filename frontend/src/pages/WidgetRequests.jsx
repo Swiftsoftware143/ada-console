@@ -11,8 +11,8 @@ import StatusBadge from "@/components/StatusBadge";
 
 // NoCodeBackend Config
 const NOCODEBACKEND_API_KEY = '3a8c4c52bfafbe26fe25ca473f8a25bbea6c66448a6dfef2bab6fe8a67ef';
-const NOCODEBACKEND_BASE = 'https://api.nocodebackend.com/api/v1';
-const TABLE = 'ada_widget_requests';
+const NOCODEBACKEND_BASE = 'https://openapi.nocodebackend.com';
+const INSTANCE = '54738_ada_swift';
 const WEBHOOK_SERVER = 'http://localhost:3459';
 
 export default function WidgetRequests() {
@@ -36,7 +36,7 @@ export default function WidgetRequests() {
   const loadWidgets = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${NOCODEBACKEND_BASE}/${TABLE}?limit=1000&sort=created_at:desc`, {
+      const response = await fetch(`${NOCODEBACKEND_BASE}/read/ada_widget_requests?Instance=${INSTANCE}&limit=1000&sort=created_at&order=desc`, {
         headers: {
           'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
           'Content-Type': 'application/json'
@@ -152,7 +152,7 @@ export default function WidgetRequests() {
     try {
       const newValue = !widget.auto_deliver;
       
-      const response = await fetch(`${NOCODEBACKEND_BASE}/${TABLE}/${widget.id}`, {
+      const response = await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
