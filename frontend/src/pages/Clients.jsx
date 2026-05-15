@@ -104,7 +104,15 @@ export default function Clients() {
     
     const finalTags = Array.from(allTags).sort();
     console.log("Final available tags:", finalTags);
-    setAvailableTags(finalTags);
+    
+    // Fallback to default tags if none found
+    if (finalTags.length === 0) {
+      const defaults = ["Medical", "Local Business", "E-commerce", "Professional Services", "Non-Profit", "Enterprise", "Basic Plan", "Pro Plan"];
+      console.log("Using default tags:", defaults);
+      setAvailableTags(defaults);
+    } else {
+      setAvailableTags(finalTags);
+    }
     setLocations(Array.from(allLocs).sort());
   }, []);
 

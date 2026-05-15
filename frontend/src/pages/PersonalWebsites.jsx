@@ -95,7 +95,15 @@ export default function PersonalWebsites() {
       if (item.location) allLocs.add(item.location);
     });
     
-    setAvailableTags(Array.from(allTags).sort());
+    const finalTags = Array.from(allTags).sort();
+    
+    // Fallback to default tags if none found
+    if (finalTags.length === 0) {
+      const defaults = ["Medical", "Local Business", "E-commerce", "Professional Services", "Non-Profit", "Enterprise", "Basic Plan", "Pro Plan"];
+      setAvailableTags(defaults);
+    } else {
+      setAvailableTags(finalTags);
+    }
     setLocations(Array.from(allLocs).sort());
   }, []);
 
