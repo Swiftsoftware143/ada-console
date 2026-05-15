@@ -47,11 +47,13 @@ export default function PersonalWebsiteDetail() {
   const loadTags = useCallback(async () => {
     try {
       // Load from settings first
-      const { data: settingsData } = await supabase
+      const { data: settingsData, error: settingsError } = await supabase
         .from("settings")
         .select("value")
         .eq("key", "tags")
         .maybeSingle();
+      
+      console.log("Loading tags from settings:", settingsData, "Error:", settingsError);
       
       const allTags = new Set();
       
@@ -59,28 +61,22 @@ export default function PersonalWebsiteDetail() {
         const parsed = typeof settingsData.value === 'string'
           ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
           : Array.isArray(settingsData.value) ? settingsData.value : [];
+        console.log("Parsed tags from settings:", parsed);
         parsed.forEach(t => allTags.add(t));
       }
       
-      // Also load from existing clients/websites
-      const [{ data: clients }, { data: websites }] = await Promise.all([
-        supabase.from("clients").select("tags"),
-        supabase.from("personal_websites").select("tags"),
-      ]);
-      
-      [...(clients || []), ...(websites || [])].forEach(item => {
-        if (item.tags) {
-          if (typeof item.tags === 'string') {
-            item.tags.split(',').forEach(t => allTags.add(t.trim()));
-          } else if (Array.isArray(item.tags)) {
-            item.tags.forEach(t => allTags.add(t));
-          }
-        }
-      });
+      // If no tags in settings, use defaults
+      if (allTags.size === 0) {
+        const defaults = ["Medical", "Local Business", "E-commerce", "Professional Services", "Non-Profit", "Enterprise", "Basic Plan", "Pro Plan"];
+        defaults.forEach(t => allTags.add(t));
+        console.log("Using default tags:", defaults);
+      }
       
       setAvailableTags(Array.from(allTags).sort());
     } catch (err) {
       console.error("Error loading tags:", err);
+      // Fallback to defaults on error
+      setAvailableTags(["Medical", "Local Business", "E-commerce", "Professional Services", "Non-Profit", "Enterprise", "Basic Plan", "Pro Plan"]);
     }
   }, []);
 
@@ -199,10 +195,30 @@ export default function PersonalWebsiteDetail() {
   };
 
   // Helper to add a tag
-  const addTag = (tag) => {
+  const addTag = async (tag) => {
     const current = getCurrentTags();
     if (!current.includes(tag)) {
       update({ tags: [...current, tag].join(', ') });
+      
+      // If this is a new tag not in Tag Manager, add it
+      if (!availableTags.includes(tag)) {
+        const newTags = [...availableTags, tag].sort();
+        setAvailableTags(newTags);
+        
+        // Save to Tag Manager (settings)
+        try {
+          await supabase
+            .from("settings")
+            .upsert({ 
+              key: "tags", 
+              value: newTags.join(", "),
+              updated_at: new Date().toISOString() 
+            });
+          console.log("Added new tag to Tag Manager:", tag);
+        } catch (e) {
+          console.error("Failed to save tag to Tag Manager:", e);
+        }
+      }
     }
   };
 
@@ -294,7 +310,7 @@ export default function PersonalWebsiteDetail() {
                 )}
               </div>
               
-              {/* Tag dropdown */}
+              {/* Tag dropdown - show ALL available tags */}
               <Select 
                 value="__placeholder__" 
                 onValueChange={(val) => {
@@ -307,15 +323,15 @@ export default function PersonalWebsiteDetail() {
                   <Tag className="h-4 w-4 mr-2 text-[#64748b]" />
                   <SelectValue placeholder="Select a tag from Tag Manager..." />
                 </SelectTrigger>
-                <SelectContent className="bg-[#1e2130] border-[#2e3245]">
+                <SelectContent className="bg-[#1e2130] border-[#2e3245] max-h-[300px]">
                   <SelectItem value="__placeholder__" disabled>Select a tag...</SelectItem>
-                  {availableTags
-                    .filter(t => !getCurrentTags().includes(t))
-                    .map((tag) => (
-                      <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-                    ))}
-                  {availableTags.filter(t => !getCurrentTags().includes(t)).length === 0 && (
-                    <SelectItem value="__empty__" disabled>All tags already assigned</SelectItem>
+                  {availableTags.map((tag) => (
+                    <SelectItem key={tag} value={tag}>
+                      {getCurrentTags().includes(tag) ? `✓ ${tag} (already assigned)` : tag}
+                    </SelectItem>
+                  ))}
+                  {availableTags.length === 0 && (
+                    <SelectItem value="__empty__" disabled>No tags in Tag Manager</SelectItem>
                   )}
                 </SelectContent>
               </Select>
