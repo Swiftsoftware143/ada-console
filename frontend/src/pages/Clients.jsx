@@ -62,11 +62,14 @@ export default function Clients() {
 
   const loadFilters = useCallback(async () => {
     // Load tags from settings (Tag Manager) first
-    const { data: settingsData } = await supabase
+    console.log("Loading tags from settings...");
+    const { data: settingsData, error: settingsError } = await supabase
       .from("settings")
       .select("value")
       .eq("key", "tags")
       .maybeSingle();
+    
+    console.log("Settings data:", settingsData, "Error:", settingsError);
     
     const allTags = new Set();
     
@@ -74,7 +77,10 @@ export default function Clients() {
       const parsed = typeof settingsData.value === 'string'
         ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
         : Array.isArray(settingsData.value) ? settingsData.value : [];
+      console.log("Parsed tags from settings:", parsed);
       parsed.forEach(t => allTags.add(t));
+    } else {
+      console.log("No tags found in settings, using defaults");
     }
     
     // Also load from existing clients/websites
@@ -96,7 +102,9 @@ export default function Clients() {
       if (item.location) allLocs.add(item.location);
     });
     
-    setAvailableTags(Array.from(allTags).sort());
+    const finalTags = Array.from(allTags).sort();
+    console.log("Final available tags:", finalTags);
+    setAvailableTags(finalTags);
     setLocations(Array.from(allLocs).sort());
   }, []);
 
