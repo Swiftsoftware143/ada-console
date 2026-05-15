@@ -342,7 +342,7 @@ SwiftImpact Solutions Team`;
           name: widget.business_name,
           domain: widget.domain,
           plan_tier: widget.plan_tier || 'basic',
-          category: 'Widget Request',
+          tags: 'Widget Request',
           active: false,
           created_at: new Date().toISOString(),
           notes: `Contact: ${widget.contact_name} (${widget.contact_email})`
