@@ -168,7 +168,10 @@ export default function WidgetRequests() {
     try {
       const embedCode = generateEmbedCode(widget.widget_id, widget.domain, widget.plan_tier);
       
-      const response = await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
+      const url = `${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`;
+      console.log('Delivering to:', url);
+      
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
@@ -181,13 +184,14 @@ export default function WidgetRequests() {
         })
       });
 
+      console.log('Response status:', response.status);
+
       if (response.ok) {
         setMessage({ type: 'success', text: 'Widget delivered! Embed code generated.' });
         loadWidgets();
       } else {
-        const errorText = await response.text();
-        console.error('Deliver failed:', errorText);
-        setMessage({ type: 'error', text: 'Delivery failed. Check console.' });
+        console.error('Deliver failed with status:', response.status);
+        setMessage({ type: 'error', text: `Delivery failed (HTTP ${response.status})` });
       }
     } catch (error) {
       console.error('Deliver error:', error);
