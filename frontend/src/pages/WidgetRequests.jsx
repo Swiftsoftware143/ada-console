@@ -194,14 +194,14 @@ export default function WidgetRequests() {
       </div>
 
       {/* Add Widget Form */}
-      <div className="bg-white rounded-xl border border-[#e2e8f0] p-6">
-        <h3 className="text-lg font-semibold text-[#0f172a] mb-4">Add New Website</h3>
+      <div className="bg-[#1e293b] rounded-xl border border-[#334155] p-6">
+        <h3 className="text-lg font-semibold text-[#e2e8f0] mb-4">Add New Website</h3>
         
         {message && (
           <div className={`mb-4 p-4 rounded-lg ${
             message.type === 'success' 
-              ? 'bg-green-50 text-green-700 border border-green-200' 
-              : 'bg-red-50 text-red-700 border border-red-200'
+              ? 'bg-green-900/30 text-green-400 border border-green-700' 
+              : 'bg-red-900/30 text-red-400 border border-red-700'
           }`}>
             {message.text}
           </div>
@@ -210,55 +210,59 @@ export default function WidgetRequests() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Business Name *</Label>
+              <Label className="text-[#e2e8f0]">Business Name *</Label>
               <Input
                 value={formData.business_name}
                 onChange={(e) => setFormData({...formData, business_name: e.target.value})}
                 placeholder="Acme Corporation"
                 required
+                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0] placeholder:text-[#64748b]"
               />
             </div>
             <div className="space-y-2">
-              <Label>Contact Name *</Label>
+              <Label className="text-[#e2e8f0]">Contact Name *</Label>
               <Input
                 value={formData.contact_name}
                 onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
                 placeholder="John Doe"
                 required
+                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0] placeholder:text-[#64748b]"
               />
             </div>
             <div className="space-y-2">
-              <Label>Contact Email *</Label>
+              <Label className="text-[#e2e8f0]">Contact Email *</Label>
               <Input
                 type="email"
                 value={formData.contact_email}
                 onChange={(e) => setFormData({...formData, contact_email: e.target.value})}
                 placeholder="john@acme.com"
                 required
+                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0] placeholder:text-[#64748b]"
               />
             </div>
             <div className="space-y-2">
-              <Label>Domain *</Label>
+              <Label className="text-[#e2e8f0]">Domain *</Label>
               <Input
                 value={formData.domain}
                 onChange={(e) => setFormData({...formData, domain: e.target.value})}
                 placeholder="acme.com"
                 required
+                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0] placeholder:text-[#64748b]"
               />
             </div>
             <div className="space-y-2">
-              <Label>Plan Tier</Label>
+              <Label className="text-[#e2e8f0]">Plan Tier</Label>
               <Select 
                 value={formData.plan_tier}
                 onValueChange={(value) => setFormData({...formData, plan_tier: value})}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="basic">Basic</SelectItem>
-                  <SelectItem value="pro">Pro</SelectItem>
-                  <SelectItem value="enterprise">Enterprise</SelectItem>
+                <SelectContent className="bg-[#1e293b] border-[#334155]">
+                  <SelectItem value="basic" className="text-[#e2e8f0]">Basic</SelectItem>
+                  <SelectItem value="pro" className="text-[#e2e8f0]">Pro</SelectItem>
+                  <SelectItem value="enterprise" className="text-[#e2e8f0]">Enterprise</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -266,8 +270,9 @@ export default function WidgetRequests() {
               <Checkbox
                 checked={formData.auto_deliver}
                 onCheckedChange={(checked) => setFormData({...formData, auto_deliver: checked})}
+                className="border-[#334155] data-[state=checked]:bg-[#4ade80] data-[state=checked]:border-[#4ade80]"
               />
-              <Label className="cursor-pointer">Auto-deliver widget</Label>
+              <Label className="cursor-pointer text-[#e2e8f0]">Auto-deliver widget</Label>
             </div>
           </div>
           <Button type="submit" disabled={formLoading} className="w-full sm:w-auto">
@@ -277,8 +282,8 @@ export default function WidgetRequests() {
       </div>
 
       {/* Widget List */}
-      <div className="bg-white rounded-xl border border-[#e2e8f0] p-6">
-        <h3 className="text-lg font-semibold text-[#0f172a] mb-4">Widget Requests</h3>
+      <div className="bg-[#1e293b] rounded-xl border border-[#334155] p-6">
+        <h3 className="text-lg font-semibold text-[#e2e8f0] mb-4">Widget Requests</h3>
         
         {loading ? (
           <div className="text-center py-10 text-[#64748b]">Loading widgets...</div>
@@ -292,7 +297,7 @@ export default function WidgetRequests() {
             {widgets.map((widget) => (
               <div 
                 key={widget.widget_id}
-                className="border border-[#e2e8f0] rounded-lg p-4 hover:border-[#4ade80] transition-colors"
+                className="border border-[#334155] rounded-lg p-4 hover:border-[#4ade80] transition-colors bg-[#0f172a]"
               >
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   <div className="flex-1">
@@ -316,7 +321,7 @@ export default function WidgetRequests() {
                     </p>
                     
                     {showEmbed[widget.widget_id] && (
-                      <pre className="mt-3 p-3 bg-[#0f172a] text-[#4ade80] rounded-lg text-xs overflow-x-auto">
+                      <pre className="mt-3 p-3 bg-[#0f172a] text-[#4ade80] rounded-lg text-xs overflow-x-auto border border-[#334155]">
                         {widget.embed_code || 'No embed code generated yet'}
                       </pre>
                     )}
