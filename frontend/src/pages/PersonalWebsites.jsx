@@ -36,7 +36,7 @@ import { toast } from "sonner";
 const COLUMNS = [
   { key: "name", label: "Website Name" },
   { key: "domain", label: "Domain" },
-  { key: "category", label: "Category" },
+  { key: "tags", label: "Tags" },
   { key: "location", label: "Location" },
   { key: "plan_tier", label: "Plan Tier" },
   { key: "active", label: "Status" },
@@ -47,32 +47,39 @@ export default function PersonalWebsites() {
   const [websites, setWebsites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [tagFilter, setTagFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [categories, setCategories] = useState([]);
+  const [availableTags, setAvailableTags] = useState([]);
   const [locations, setLocations] = useState([]);
   const [sortKey, setSortKey] = useState("created_at");
   const [sortDir, setSortDir] = useState("desc");
   const [addOpen, setAddOpen] = useState(false);
-  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+
   const [toDelete, setToDelete] = useState(null);
   const navigate = useNavigate();
 
   const loadFilters = useCallback(async () => {
     const [{ data: clientsData }, { data: websitesData }] = await Promise.all([
-      supabase.from("clients").select("category,location"),
-      supabase.from("personal_websites").select("category,location"),
+      supabase.from("clients").select("tags,location"),
+      supabase.from("personal_websites").select("tags,location"),
     ]);
     
-    const allCats = new Set();
+    const allTags = new Set();
     const allLocs = new Set();
     [...(clientsData || []), ...(websitesData || [])].forEach(item => {
-      if (item.category) allCats.add(item.category);
+      // Parse tags (comma-separated or array)
+      if (item.tags) {
+        if (typeof item.tags === 'string') {
+          item.tags.split(',').forEach(t => allTags.add(t.trim()));
+        } else if (Array.isArray(item.tags)) {
+          item.tags.forEach(t => allTags.add(t));
+        }
+      }
       if (item.location) allLocs.add(item.location);
     });
     
-    setCategories(Array.from(allCats).sort());
+    setAvailableTags(Array.from(allTags).sort());
     setLocations(Array.from(allLocs).sort());
   }, []);
 
@@ -144,18 +151,20 @@ export default function PersonalWebsites() {
         w.name?.toLowerCase().includes(search.toLowerCase()) ||
         w.domain?.toLowerCase().includes(search.toLowerCase()) ||
         w.plan_tier?.toLowerCase().includes(search.toLowerCase()) ||
-        w.category?.toLowerCase().includes(search.toLowerCase()) ||
+        w.tags?.toLowerCase().includes(search.toLowerCase()) ||
         w.location?.toLowerCase().includes(search.toLowerCase());
       
-      const matchesCategory = categoryFilter === "all" || w.category === categoryFilter;
+      // Check if website has the selected tag
+      const websiteTags = w.tags ? (typeof w.tags === 'string' ? w.tags.split(',').map(t => t.trim()) : w.tags) : [];
+      const matchesTag = tagFilter === "all" || websiteTags.includes(tagFilter);
       const matchesLocation = locationFilter === "all" || w.location === locationFilter;
       const matchesStatus = statusFilter === "all" || 
         (statusFilter === "active" && w.active) || 
         (statusFilter === "inactive" && !w.active);
       
-      return matchesSearch && matchesCategory && matchesLocation && matchesStatus;
+      return matchesSearch && matchesTag && matchesLocation && matchesStatus;
     });
-  }, [websites, search, categoryFilter, locationFilter, statusFilter]);
+  }, [websites, search, tagFilter, locationFilter, statusFilter]);
 
   const filteredSorted = useMemo(
     () => sortByKey(filteredWebsites, sortKey, sortDir),
@@ -163,13 +172,13 @@ export default function PersonalWebsites() {
   );
 
   const clearFilters = () => {
-    setCategoryFilter("all");
+    setTagFilter("all");
     setLocationFilter("all");
     setStatusFilter("all");
     setSearch("");
   };
 
-  const hasFilters = categoryFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || search !== "";
+  const hasFilters = tagFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || search !== "";
 
   const renderTable = () => {
     if (loading) {
@@ -224,11 +233,18 @@ export default function PersonalWebsites() {
                 <td className="px-6 py-4 text-white font-medium">{w.name}</td>
                 <td className="px-6 py-4 text-[#94a3b8] font-mono text-xs">{w.domain}</td>
                 <td className="px-6 py-4">
-                  {w.category ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#007bff]/10 text-[#007bff] text-xs">
-                      <Tag className="h-3 w-3" />
-                      {w.category}
-                    </span>
+                  {w.tags ? (
+                    <div className="flex flex-wrap gap-1">
+                      {(typeof w.tags === 'string' ? w.tags.split(',').map(t => t.trim()) : w.tags).slice(0, 3).map((tag, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#007bff]/10 text-[#007bff] text-xs">
+                          <Tag className="h-3 w-3" />
+                          {tag}
+                        </span>
+                      ))}
+                      {(typeof w.tags === 'string' ? w.tags.split(',').map(t => t.trim()) : w.tags).length > 3 && (
+                        <span className="text-[#64748b] text-xs">+{(typeof w.tags === 'string' ? w.tags.split(',').map(t => t.trim()) : w.tags).length - 3} more</span>
+                      )}
+                    </div>
                   ) : (
                     <span className="text-[#64748b] text-xs">-</span>
                   )}
@@ -306,14 +322,6 @@ export default function PersonalWebsites() {
         actions={
           <div className="flex gap-2">
             <Button
-              variant="outline"
-              onClick={() => setCategoryManagerOpen(true)}
-              className="border-[#2e3245] text-[#94a3b8] hover:text-white hover:border-[#3e445e]"
-            >
-              <Tag className="h-4 w-4 mr-2" />
-              Categories
-            </Button>
-            <Button
               data-testid="add-new-website-btn"
               onClick={() => setAddOpen(true)}
               className="bg-[#007bff] hover:bg-[#0056b3] text-white shadow-[0_0_15px_rgba(0,123,255,0.25)] hover:shadow-[0_0_22px_rgba(0,123,255,0.45)] transition-shadow"
@@ -339,15 +347,15 @@ export default function PersonalWebsites() {
               />
             </div>
             
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select value={tagFilter} onValueChange={setTagFilter}>
               <SelectTrigger className="w-[160px] bg-[#0f1117] border-[#2e3245] text-white">
                 <Tag className="h-4 w-4 mr-2 text-[#64748b]" />
-                <SelectValue placeholder="Category" />
+                <SelectValue placeholder="Tag" />
               </SelectTrigger>
               <SelectContent className="bg-[#1e2130] border-[#2e3245]">
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                <SelectItem value="all">All Tags</SelectItem>
+                {availableTags.map((tag) => (
+                  <SelectItem key={tag} value={tag}>{tag}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -405,11 +413,7 @@ export default function PersonalWebsites() {
         onCreated={() => { console.log("Website created, refreshing..."); load(); }}
         isPersonal={true}
       />
-      <CategoryManager 
-        open={categoryManagerOpen} 
-        onOpenChange={setCategoryManagerOpen} 
-        onCategoriesChange={loadFilters}
-      />
+
       <DeleteConfirmModal
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}
