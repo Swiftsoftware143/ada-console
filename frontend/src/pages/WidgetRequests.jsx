@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Puzzle, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Code, Trash2, Edit2, Move } from "lucide-react";
+import { Puzzle, Send, Clock, CheckCircle, AlertCircle, Code, Trash2, Edit2, Move } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,6 @@ const INSTANCE = '54738_ada_swift';
 const WEBHOOK_SERVER = 'https://43ce-187-124-147-183.ngrok-free.app';
 
 export default function WidgetRequests() {
-  // Widget Requests page - NoCodeBackend integration
   const [widgets, setWidgets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
@@ -25,7 +24,6 @@ export default function WidgetRequests() {
   const [editingWidget, setEditingWidget] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   
-  // Form state
   const [formData, setFormData] = useState({
     business_name: '',
     contact_name: '',
@@ -74,7 +72,6 @@ export default function WidgetRequests() {
     setFormLoading(true);
     setMessage(null);
 
-    // Check for duplicates
     const duplicate = widgets.find(w => 
       w.contact_email === formData.contact_email || 
       w.domain === formData.domain
@@ -87,7 +84,6 @@ export default function WidgetRequests() {
     }
 
     try {
-      // Create clean data object for JSON serialization
       const submitData = {
         business_name: String(formData.business_name || ''),
         contact_name: String(formData.contact_name || ''),
@@ -103,23 +99,10 @@ export default function WidgetRequests() {
         body: JSON.stringify(submitData)
       });
 
-      // Clone response before reading to avoid "body stream already read" error
-      const responseClone = response.clone();
-      let result;
-      try {
-        result = await response.json();
-      } catch (parseError) {
-        // If JSON parse fails, try to get text from clone
-        const text = await responseClone.text();
-        console.error('Response parse error:', text);
-        throw new Error('Failed to parse server response');
-      }
+      const result = await response.json();
 
       if (result.success) {
-        setMessage({ 
-          type: 'success', 
-          text: `Widget created! ID: ${result.widget_id}` 
-        });
+        setMessage({ type: 'success', text: `Widget created! ID: ${result.widget_id}` });
         setFormData({
           business_name: '',
           contact_name: '',
@@ -141,10 +124,8 @@ export default function WidgetRequests() {
 
   const deliverWidget = async (widget) => {
     try {
-      // Generate embed code locally
       const embedCode = `<script>!function(){var s=document.createElement("script");s.src="https://adaswift.netlify.app/loader.js";s.setAttribute("data-domain","${widget.domain}");s.async=!0;document.body.appendChild(s)}();</script>`;
       
-      // Update widget with embed code and mark as delivered
       const response = await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
         method: 'PUT',
         headers: {
@@ -227,35 +208,7 @@ export default function WidgetRequests() {
   };
 
   const moveToClients = async (widget) => {
-    // TODO: Integrate with existing Clients system
     alert(`Move to Clients: ${widget.business_name}\n\nThis will be integrated with the existing Clients tab.`);
-  };
-
-  const toggleAutoDeliver = async (widget) => {
-    try {
-      const newValue = !widget.auto_deliver;
-      
-      const response = await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ auto_deliver: newValue })
-      });
-
-      if (response.ok) {
-        setMessage({ 
-          type: 'success', 
-          text: `Auto-delivery ${newValue ? 'enabled' : 'disabled'}` 
-        });
-        loadWidgets();
-      } else {
-        setMessage({ type: 'error', text: 'Failed to update' });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message });
-    }
   };
 
   const toggleEmbed = (widgetId) => {
@@ -272,12 +225,8 @@ export default function WidgetRequests() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Widget Requests" 
-        subtitle="Manage ADA widget requests and deliveries"
-      />
+      <PageHeader title="Widget Requests" subtitle="Manage ADA widget requests and deliveries" />
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Widgets" value={stats.total} icon={Puzzle} />
         <StatCard title="Pending" value={stats.pending} icon={Clock} />
@@ -285,7 +234,6 @@ export default function WidgetRequests() {
         <StatCard title="Auto-Delivery" value={stats.autoDeliver} icon={Send} />
       </div>
 
-      {/* Add Widget Form */}
       <div className="bg-[#1e293b] rounded-xl border border-[#334155] p-6">
         <h3 className="text-lg font-semibold text-[#e2e8f0] mb-4">Add New Website</h3>
         
@@ -375,7 +323,6 @@ export default function WidgetRequests() {
         </form>
       </div>
 
-      {/* Widget List */}
       <div className="bg-[#1e293b] rounded-xl border border-[#334155] p-6">
         <h3 className="text-lg font-semibold text-[#e2e8f0] mb-4">Widget Requests</h3>
         
@@ -394,7 +341,6 @@ export default function WidgetRequests() {
                 className="border border-[#334155] rounded-lg p-4 hover:border-[#4ade80] transition-colors bg-[#0f172a]"
               >
                 {editingWidget === widget.id ? (
-                  // Edit Form
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -436,79 +382,58 @@ export default function WidgetRequests() {
                     </div>
                   </div>
                 ) : (
-                  // View Mode
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-semibold text-[#e2e8f0]">{widget.business_name}</h4>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPlanColor(widget.plan_tier)}`}>
-                        {widget.plan_tier}
-                      </span>
-                      <StatusBadge status={widget.status} />
-                      {widget.auto_deliver && (
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          Auto
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPlanColor(widget.plan_tier)}`}>
+                          {widget.plan_tier}
                         </span>
+                        <StatusBadge status={widget.status} />
+                        {widget.auto_deliver && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Auto</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-[#64748b]">
+                        {widget.contact_name} • {widget.contact_email} • {widget.domain}
+                      </p>
+                      <p className="text-xs text-[#94a3b8] mt-1">
+                        Widget ID: {widget.widget_id ? widget.widget_id.substring(0, 16) : 'N/A'}...
+                      </p>
+                      
+                      {showEmbed[widget.id] && (
+                        <pre className="mt-3 p-3 bg-[#0f172a] text-[#4ade80] rounded-lg text-xs overflow-x-auto border border-[#334155]">
+                          {widget.embed_code || 'No embed code generated yet'}
+                        </pre>
                       )}
                     </div>
-                    <p className="text-sm text-[#64748b]">
-                      {widget.contact_name} • {widget.contact_email} • {widget.domain}
-                    </p>
-                    <p className="text-xs text-[#94a3b8] mt-1">
-                      Widget ID: {widget.widget_id ? widget.widget_id.substring(0, 16) : 'N/A'}...
-                    </p>
                     
-                    {showEmbed[widget.id] && (
-                      <pre className="mt-3 p-3 bg-[#0f172a] text-[#4ade80] rounded-lg text-xs overflow-x-auto border border-[#334155]">
-                        {widget.embed_code || 'No embed code generated yet'}
-                      </pre>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {widget.status !== 'delivered' && (
-                      <Button
-                        size="sm"
-                        onClick={() => deliverWidget(widget)}
-                      >
-                        <Send className="h-4 w-4 mr-1" />
-                        Deliver
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {widget.status !== 'delivered' && (
+                        <Button size="sm" onClick={() => deliverWidget(widget)}>
+                          <Send className="h-4 w-4 mr-1" />
+                          Deliver
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => startEdit(widget)}>
+                        <Edit2 className="h-4 w-4 mr-1" />
+                        Edit
                       </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => startEdit(widget)}
-                    >
-                      <Edit2 className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => deleteWidget(widget)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => moveToClients(widget)}
-                    >
-                      <Move className="h-4 w-4 mr-1" />
-                      To Clients
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => toggleEmbed(widget.id)}
-                    >
-                      <Code className="h-4 w-4 mr-1" />
-                      {showEmbed[widget.id] ? 'Hide' : 'Code'}
-                    </Button>
+                      <Button size="sm" variant="outline" onClick={() => deleteWidget(widget)}>
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => moveToClients(widget)}>
+                        <Move className="h-4 w-4 mr-1" />
+                        To Clients
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => toggleEmbed(widget.id)}>
+                        <Code className="h-4 w-4 mr-1" />
+                        {showEmbed[widget.id] ? 'Hide' : 'Code'}
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
