@@ -126,6 +126,7 @@ function TagManagerCard() {
   const [newTag, setNewTag] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
     loadTags();
@@ -197,6 +198,35 @@ function TagManagerCard() {
     saveTags(updated);
   };
 
+  const clearAllTagsFromRecords = async () => {
+    if (!window.confirm('WARNING: This will remove ALL tags from ALL clients and websites.\n\nAre you sure?')) return;
+    
+    setClearing(true);
+    try {
+      // Clear tags from clients
+      const { error: clientsError } = await supabase
+        .from('clients')
+        .update({ tags: null })
+        .neq('tags', null);
+      
+      if (clientsError) throw clientsError;
+      
+      // Clear tags from personal_websites
+      const { error: websitesError } = await supabase
+        .from('personal_websites')
+        .update({ tags: null })
+        .neq('tags', null);
+      
+      if (websitesError) throw websitesError;
+      
+      toast.success('All tags cleared from clients and websites');
+    } catch (e) {
+      console.error('Error clearing tags:', e);
+      toast.error('Failed to clear tags: ' + e.message);
+    }
+    setClearing(false);
+  };
+
   if (loading) return (
     <Card className="mt-6 bg-[#1e2130] border-[#2e3245]">
       <CardContent className="p-6 text-[#64748b]">Loading tags...</CardContent>
@@ -258,6 +288,21 @@ function TagManagerCard() {
         <p className="text-xs text-[#64748b]">
           Tags work like labels — assign multiple tags to each client for flexible filtering. Delete unused tags anytime.
         </p>
+        
+        <div className="pt-4 border-t border-[#2e3245]">
+          <Button 
+            onClick={clearAllTagsFromRecords} 
+            disabled={clearing}
+            variant="outline"
+            className="border-[#ef4444]/50 text-[#ef4444] hover:bg-[#ef4444]/10 hover:text-[#ef4444]"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            {clearing ? 'Clearing...' : 'Clear All Tags from All Records'}
+          </Button>
+          <p className="text-xs text-[#64748b] mt-2">
+            Removes all tags from every client and website. Use this to start fresh.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
