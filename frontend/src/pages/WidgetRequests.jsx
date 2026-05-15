@@ -331,18 +331,19 @@ SwiftImpact Solutions Team`;
   };
 
   const moveToClients = async (widget) => {
-    if (!window.confirm(`Move "${widget.business_name}" to Clients?`)) return;
+    if (!window.confirm(`Move "${widget.business_name}" to Clients? This will remove it from Widget Requests.`)) return;
     
     try {
       const { supabase } = await import('@/lib/supabase');
       
+      // First, create the client in Supabase
       const { data, error } = await supabase
         .from('clients')
         .insert([{
           name: widget.business_name,
           domain: widget.domain,
           plan_tier: widget.plan_tier || 'basic',
-          tags: 'Widget Request',
+          tags: ['Widget Request'],
           active: false,
           created_at: new Date().toISOString(),
           notes: `Contact: ${widget.contact_name} (${widget.contact_email})`
@@ -352,18 +353,25 @@ SwiftImpact Solutions Team`;
       if (error) {
         console.error('Supabase error:', error);
         setMessage({ type: 'error', text: `Failed: ${error.message}` });
-      } else {
-        setMessage({ type: 'success', text: `Moved to Clients! ID: ${data?.[0]?.id}` });
-        await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ status: 'migrated' })
-        });
-        loadWidgets();
+        return;
       }
+      
+      // Then, DELETE the widget request from NoCodeBackend (not just update status)
+      const deleteResponse = await fetch(`${NOCODEBACKEND_BASE}/delete/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (deleteResponse.ok) {
+        setMessage({ type: 'success', text: `Moved to Clients and removed from Widget Requests! ID: ${data?.[0]?.id}` });
+      } else {
+        setMessage({ type: 'warning', text: `Moved to Clients but could not remove from Widget Requests` });
+      }
+      
+      loadWidgets();
     } catch (error) {
       console.error('Move error:', error);
       setMessage({ type: 'error', text: error.message });
