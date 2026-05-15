@@ -84,25 +84,52 @@ export default function WidgetRequests() {
     }
 
     try {
+      // Create widget directly in NoCodeBackend (bypass CORS webhook issue)
+      const widget_id = crypto.randomUUID();
       const submitData = {
         business_name: String(formData.business_name || ''),
         contact_name: String(formData.contact_name || ''),
         contact_email: String(formData.contact_email || ''),
         domain: String(formData.domain || ''),
         plan_tier: String(formData.plan_tier || 'basic'),
-        auto_deliver: Boolean(formData.auto_deliver)
+        status: 'pending',
+        widget_id: widget_id
       };
       
-      const response = await fetch(`${WEBHOOK_SERVER}/webhook/ada-widget-crm`, {
+      const response = await fetch(`${NOCODEBACKEND_BASE}/create/ada_widget_requests?Instance=${INSTANCE}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(submitData)
       });
 
       const result = await response.json();
 
-      if (result.success) {
-        setMessage({ type: 'success', text: `Widget created! ID: ${result.widget_id}` });
+      if (result.status === 'success' || result.id) {
+        // If auto-deliver is enabled, generate embed code and mark delivered
+        if (formData.auto_deliver) {
+          const embedCode = `<script>!function(){var s=document.createElement("script");s.src="https://adaswift.netlify.app/loader.js";s.setAttribute("data-domain","${formData.domain}");s.async=!0;document.body.appendChild(s)}();</script>`;
+          
+          await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${result.id}?Instance=${INSTANCE}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              embed_code: embedCode,
+              status: 'delivered',
+              delivered_at: new Date().toISOString()
+            })
+          });
+          
+          setMessage({ type: 'success', text: `Widget created and delivered! ID: ${widget_id.substring(0,8)}...` });
+        } else {
+          setMessage({ type: 'success', text: `Widget created! ID: ${widget_id.substring(0,8)}... (Manual review)` });
+        }
+        
         setFormData({
           business_name: '',
           contact_name: '',
@@ -113,7 +140,7 @@ export default function WidgetRequests() {
         });
         loadWidgets();
       } else {
-        setMessage({ type: 'error', text: result.message || result.error });
+        setMessage({ type: 'error', text: result.message || 'Failed to create widget' });
       }
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
