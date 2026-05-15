@@ -25,7 +25,6 @@ import {
 import MasterStatusHero from "@/components/MasterStatusHero";
 import EmbedCodeBlock from "@/components/EmbedCodeBlock";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
-import CategoryManager from "@/components/CategoryManager";
 
 const hydrate = (data) => ({
   ...data,
@@ -40,24 +39,48 @@ export default function ClientDetail({ isPersonal = false }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
-  const [categories, setCategories] = useState(["Ecommerce", "Newsletters", "SaaS"]);
+  const [availableTags, setAvailableTags] = useState([]);
+  const [tagInput, setTagInput] = useState("");
   const [profileFilter, setProfileFilter] = useState("");
   const [featureFilter, setFeatureFilter] = useState("");
 
-  const loadCategories = useCallback(async () => {
+  const loadTags = useCallback(async () => {
     try {
+      // Load from settings first
+      const { data: settingsData } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "tags")
+        .maybeSingle();
+      
+      const allTags = new Set();
+      
+      if (settingsData?.value) {
+        const parsed = typeof settingsData.value === 'string'
+          ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
+          : Array.isArray(settingsData.value) ? settingsData.value : [];
+        parsed.forEach(t => allTags.add(t));
+      }
+      
+      // Also load from existing clients/websites
       const [{ data: clients }, { data: websites }] = await Promise.all([
-        supabase.from("clients").select("category"),
-        supabase.from("personal_websites").select("category"),
+        supabase.from("clients").select("tags"),
+        supabase.from("personal_websites").select("tags"),
       ]);
-      const allCats = new Set(["Ecommerce", "Newsletters", "SaaS"]);
+      
       [...(clients || []), ...(websites || [])].forEach(item => {
-        if (item.category) allCats.add(item.category);
+        if (item.tags) {
+          if (typeof item.tags === 'string') {
+            item.tags.split(',').forEach(t => allTags.add(t.trim()));
+          } else if (Array.isArray(item.tags)) {
+            item.tags.forEach(t => allTags.add(t));
+          }
+        }
       });
-      setCategories(Array.from(allCats).sort());
+      
+      setAvailableTags(Array.from(allTags).sort());
     } catch (err) {
-      console.error("Error loading categories:", err);
+      console.error("Error loading tags:", err);
     }
   }, []);
 
@@ -77,13 +100,13 @@ export default function ClientDetail({ isPersonal = false }) {
         return;
       }
       setClient(hydrate(data));
-      loadCategories(); // Load categories in background
+      loadTags();
       setLoading(false);
     })();
     return () => {
       alive = false;
     };
-  }, [id, navigate, isPersonal, loadCategories]);
+  }, [id, navigate, isPersonal, loadTags]);
 
   const update = useCallback(
     (patch) => setClient((c) => ({ ...c, ...patch })),
@@ -106,80 +129,89 @@ export default function ClientDetail({ isPersonal = false }) {
     []
   );
 
+  const handleSave = useCallback(async () => {
+    if (!client) return;
+    setSaving(true);
+    const { id: _id, created_at, updated_at, ...rest } = client;
+    const { error } = await supabase
+      .from(isPersonal ? "personal_websites" : "clients")
+      .update({ ...rest, domain: cleanDomain(rest.domain) })
+      .eq("id", id);
+    setSaving(false);
+    if (error) {
+      toast.error(error.message || "Failed to save");
+      return;
+    }
+    toast.success("Saved successfully");
+  }, [client, id, isPersonal]);
+
+  const handleDelete = useCallback(async () => {
+    const { error } = await supabase
+      .from(isPersonal ? "personal_websites" : "clients")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      toast.error("Failed to delete");
+      return;
+    }
+    toast.success("Deleted");
+    navigate(isPersonal ? "/personal-websites" : "/clients");
+  }, [id, navigate, isPersonal]);
+
+  const handleToggleActive = useCallback(async () => {
+    if (!client) return;
+    const newVal = !client.active;
+    update({ active: newVal });
+    const { error } = await supabase
+      .from(isPersonal ? "personal_websites" : "clients")
+      .update({ active: newVal })
+      .eq("id", id);
+    if (error) {
+      toast.error("Failed to update status");
+      update({ active: !newVal });
+      return;
+    }
+    toast.success(newVal ? "Activated" : "Deactivated");
+  }, [client, id, isPersonal, update]);
+
   const embedCode = useMemo(
     () => generateEmbedCode(client?.domain),
     [client?.domain]
   );
 
-  const handleSave = async () => {
-    if (!client) return;
-    if (!client.name?.trim()) return toast.error("Client name is required");
-    if (!client.domain?.trim()) return toast.error("Domain is required");
-
-    setSaving(true);
-    const payload = {
-      name: client.name.trim(),
-      domain: cleanDomain(client.domain),
-      plan_tier: client.plan_tier,
-      category: client.category?.trim() || null,
-      location: client.location?.trim() || null,
-      notes: client.notes?.trim() || null,
-      active: client.active,
-      widget_position: client.widget_position,
-      primary_color: client.primary_color,
-      enabled_profiles: client.enabled_profiles,
-      enabled_features: client.enabled_features,
-    };
-    const { data, error } = await supabase
-      .from(isPersonal ? "personal_websites" : "clients")
-      .update(payload)
-      .eq("id", client.id)
-      .select("*")
-      .single();
-    setSaving(false);
-    if (error) {
-      console.error("Save error:", error);
-      if (error.code === "23505") toast.error("Another client already uses this domain");
-      else toast.error(error.message || "Failed to save");
-      return;
-    }
-    console.log("Save response:", data);
-    setClient(hydrate(data));
-      loadCategories();
-    toast.success("Changes saved");
-  };
-
-  const handleToggleActive = async (val) => {
-    update({ active: val });
-    const { error } = await supabase
-      .from(isPersonal ? "personal_websites" : "clients")
-      .update({ active: val })
-      .eq("id", client.id);
-    if (error) {
-      toast.error("Failed to update widget status");
-      update({ active: !val });
-      return;
-    }
-    toast.success(val ? "Widget activated" : "Widget deactivated");
-  };
-
-  const handleDelete = async () => {
-    const { error } = await supabase.from(isPersonal ? "personal_websites" : "clients").delete().eq("id", client.id);
-    if (error) {
-      toast.error("Failed to delete");
-      return;
-    }
-    toast.success(`${client.name} deleted`);
-    navigate("/clients");
-  };
-
   if (loading || !client) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] text-[#64748b] text-sm" data-testid="detail-loading">
-        <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Loading client...
+      <div data-testid="client-detail-loading" className="p-10 text-center text-[#64748b]">
+        <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+        Loading...
       </div>
     );
   }
+
+  // Helper to get current tags array
+  const getCurrentTags = () => {
+    if (!client.tags) return [];
+    if (typeof client.tags === 'string') {
+      return client.tags.split(',').map(t => t.trim()).filter(Boolean);
+    }
+    if (Array.isArray(client.tags)) return client.tags;
+    return [];
+  };
+
+  // Helper to add a tag
+  const addTag = (tag) => {
+    const current = getCurrentTags();
+    if (!current.includes(tag)) {
+      update({ tags: [...current, tag].join(', ') });
+    }
+  };
+
+  // Helper to remove a tag
+  const removeTag = (idx) => {
+    const current = getCurrentTags();
+    const newTags = current.filter((_, i) => i !== idx);
+    update({ tags: newTags.join(', ') });
+  };
 
   return (
     <div data-testid="client-detail-page" className="pb-12">
@@ -193,14 +225,6 @@ export default function ClientDetail({ isPersonal = false }) {
           <ArrowLeft className="h-4 w-4" /> Back to clients
         </Link>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setCategoryManagerOpen(true)}
-            className="border-[#2e3245] text-[#94a3b8] hover:text-white hover:border-[#3e445e]"
-          >
-            <Tag className="h-4 w-4 mr-2" />
-            Categories
-          </Button>
           <Button
             variant="ghost"
             data-testid="header-delete-btn"
@@ -245,22 +269,81 @@ export default function ClientDetail({ isPersonal = false }) {
                 Stored cleanly on save (no https://, www., or trailing /).
               </p>
             </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Category">
-                <Input
-                  data-testid="field-category"
-                  value={client.category || ""}
-                  onChange={(e) => update({ category: e.target.value })}
-                  placeholder="Type new or existing category..."
-                  list="category-suggestions"
-                  className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
-                />
-                <datalist id="category-suggestions">
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat} />
+            
+            {/* Tags Field */}
+            <Field label="Tags">
+              <div className="flex flex-wrap gap-2 mb-2">
+                {getCurrentTags().map((tag, idx) => (
+                  <span 
+                    key={idx} 
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-[#007bff]/20 text-[#007bff] rounded text-xs"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(idx)}
+                      className="hover:text-white"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+              
+              {/* Quick-add from existing tags */}
+              <div className="flex flex-wrap gap-1 mb-2">
+                {availableTags
+                  .filter(t => !getCurrentTags().includes(t))
+                  .slice(0, 8)
+                  .map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => addTag(tag)}
+                      className="px-2 py-1 bg-[#2e3245] text-[#94a3b8] rounded text-xs hover:bg-[#007bff]/20 hover:text-[#007bff]"
+                    >
+                      + {tag}
+                    </button>
                   ))}
-                </datalist>
-              </Field>
+              </div>
+              
+              {/* Add custom tag */}
+              <div className="flex gap-2">
+                <Input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (tagInput.trim()) {
+                        addTag(tagInput.trim());
+                        setTagInput("");
+                      }
+                    }
+                  }}
+                  placeholder="Add custom tag..."
+                  className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b]"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (tagInput.trim()) {
+                      addTag(tagInput.trim());
+                      setTagInput("");
+                    }
+                  }}
+                  className="bg-transparent border-[#2e3245] text-white hover:bg-[#1a1d27]"
+                >
+                  Add
+                </Button>
+              </div>
+              <p className="text-xs text-[#64748b] mt-1">
+                Click quick tags or type custom. Manage all tags in Settings → Tag Manager.
+              </p>
+            </Field>
+
+            <div className="grid grid-cols-2 gap-4">
               <Field label="Location">
                 <Input
                   data-testid="field-location"
@@ -270,25 +353,25 @@ export default function ClientDetail({ isPersonal = false }) {
                   className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
                 />
               </Field>
-            </div>
-            <Field label="Plan Tier">
-              <Select
-                value={client.plan_tier}
-                onValueChange={(v) => update({ plan_tier: v })}
-              >
-                <SelectTrigger
-                  data-testid="field-plan-trigger"
-                  className="bg-[#0f1117] border-[#2e3245] text-white focus:ring-[#007bff]"
+              <Field label="Plan Tier">
+                <Select
+                  value={client.plan_tier}
+                  onValueChange={(v) => update({ plan_tier: v })}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1e2130] border-[#2e3245] text-white">
-                  <SelectItem value="basic">Basic</SelectItem>
-                  <SelectItem value="pro">Pro</SelectItem>
-                  <SelectItem value="enterprise">Enterprise</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
+                  <SelectTrigger
+                    data-testid="field-plan-trigger"
+                    className="bg-[#0f1117] border-[#2e3245] text-white focus:ring-[#007bff]"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1e2130] border-[#2e3245] text-white">
+                    <SelectItem value="basic">Basic</SelectItem>
+                    <SelectItem value="pro">Pro</SelectItem>
+                    <SelectItem value="enterprise">Enterprise</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
             <Field label="Internal Notes">
               <Textarea
                 data-testid="field-notes"
@@ -466,12 +549,6 @@ export default function ClientDetail({ isPersonal = false }) {
         onOpenChange={setDeleteOpen}
         onConfirm={handleDelete}
         clientName={client.name}
-      />
-
-      <CategoryManager
-        open={categoryManagerOpen}
-        onOpenChange={setCategoryManagerOpen}
-        onCategoriesChange={loadCategories}
       />
     </div>
   );
