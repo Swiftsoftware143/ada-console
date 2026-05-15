@@ -17,6 +17,7 @@ const TABLE = 'ada_widget_requests';
 const WEBHOOK_SERVER = 'http://localhost:3459';
 
 export default function WidgetRequests() {
+  // Widget Requests page - NoCodeBackend integration
   const [widgets, setWidgets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
