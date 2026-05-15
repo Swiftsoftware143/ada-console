@@ -106,13 +106,17 @@ export default function WidgetRequests() {
       });
 
       const result = await response.json();
+      console.log('Create result:', result);
 
-      if (result.status === 'success' || result.id) {
+      // NoCodeBackend returns { status: 'success', message: '...', id: number }
+      const recordId = result.id;
+      
+      if (result.status === 'success' && recordId) {
         // If auto-deliver is enabled, generate embed code and mark delivered
         if (formData.auto_deliver) {
-          const embedCode = `<script>!function(){var s=document.createElement("script");s.src="https://adaswift.netlify.app/loader.js";s.setAttribute("data-domain","${formData.domain}");s.async=!0;document.body.appendChild(s)}();</script>`;
+          const embedCode = `<!-- ADA Swift Widget - ${formData.plan_tier.toUpperCase()} Plan -->\n<!-- Domain: ${formData.domain} -->\n<!-- Widget ID: ${widget_id} -->\n<script>!function(){var s=document.createElement("script");s.src="https://adaswift.netlify.app/loader.js";s.setAttribute("data-domain","${formData.domain}");s.async=!0;document.body.appendChild(s)}();</script>\n<!-- End ADA Swift Widget -->`;
           
-          await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${result.id}?Instance=${INSTANCE}`, {
+          const updateResponse = await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${recordId}?Instance=${INSTANCE}`, {
             method: 'PUT',
             headers: {
               'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
@@ -125,7 +129,14 @@ export default function WidgetRequests() {
             })
           });
           
-          setMessage({ type: 'success', text: `Widget created and delivered! ID: ${widget_id.substring(0,8)}...` });
+          const updateResult = await updateResponse.json();
+          console.log('Update result:', updateResult);
+          
+          if (updateResponse.ok) {
+            setMessage({ type: 'success', text: `Widget created and delivered! ID: ${widget_id.substring(0,8)}...` });
+          } else {
+            setMessage({ type: 'warning', text: `Widget created but delivery failed: ${updateResult.message || 'Unknown error'}` });
+          }
         } else {
           setMessage({ type: 'success', text: `Widget created! ID: ${widget_id.substring(0,8)}... (Manual review)` });
         }
@@ -143,6 +154,7 @@ export default function WidgetRequests() {
         setMessage({ type: 'error', text: result.message || 'Failed to create widget' });
       }
     } catch (error) {
+      console.error('Submit error:', error);
       setMessage({ type: 'error', text: error.message });
     } finally {
       setFormLoading(false);
@@ -151,7 +163,7 @@ export default function WidgetRequests() {
 
   const deliverWidget = async (widget) => {
     try {
-      const embedCode = `<script>!function(){var s=document.createElement("script");s.src="https://adaswift.netlify.app/loader.js";s.setAttribute("data-domain","${widget.domain}");s.async=!0;document.body.appendChild(s)}();</script>`;
+      const embedCode = `<!-- ADA Swift Widget - ${(widget.plan_tier || 'basic').toUpperCase()} Plan -->\n<!-- Domain: ${widget.domain} -->\n<!-- Widget ID: ${widget.widget_id} -->\n<script>!function(){var s=document.createElement("script");s.src="https://adaswift.netlify.app/loader.js";s.setAttribute("data-domain","${widget.domain}");s.async=!0;document.body.appendChild(s)}();</script>\n<!-- End ADA Swift Widget -->`;
       
       const response = await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
         method: 'PUT',
@@ -166,13 +178,17 @@ export default function WidgetRequests() {
         })
       });
 
-      if (response.ok) {
+      const result = await response.json();
+      console.log('Deliver result:', result);
+
+      if (response.ok && result.status === 'success') {
         setMessage({ type: 'success', text: 'Widget delivered! Embed code generated.' });
         loadWidgets();
       } else {
-        setMessage({ type: 'error', text: 'Delivery failed' });
+        setMessage({ type: 'error', text: `Delivery failed: ${result.message || 'Unknown error'}` });
       }
     } catch (error) {
+      console.error('Deliver error:', error);
       setMessage({ type: 'error', text: error.message });
     }
   };
@@ -235,11 +251,73 @@ export default function WidgetRequests() {
   };
 
   const moveToClients = async (widget) => {
-    alert(`Move to Clients: ${widget.business_name}\n\nThis will be integrated with the existing Clients tab.`);
+    if (!window.confirm(`Move "${widget.business_name}" to Clients?\n\nThis will create a client record in the main Clients tab.`)) return;
+    
+    try {
+      // Import supabase dynamically to avoid issues if not available
+      const { supabase } = await import('@/lib/supabase');
+      
+      const { data, error } = await supabase
+        .from('clients')
+        .insert([{
+          name: widget.business_name,
+          domain: widget.domain,
+          contact_email: widget.contact_email,
+          contact_name: widget.contact_name,
+          plan_tier: widget.plan_tier || 'basic',
+          category: 'Widget Request',
+          active: true,
+          created_at: new Date().toISOString()
+        }])
+        .select();
+      
+      if (error) {
+        console.error('Supabase error:', error);
+        setMessage({ type: 'error', text: `Failed to move to clients: ${error.message}` });
+      } else {
+        setMessage({ type: 'success', text: `Moved to Clients! Client ID: ${data?.[0]?.id}` });
+        // Optionally update widget status to mark as moved
+        await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: 'migrated' })
+        });
+        loadWidgets();
+      }
+    } catch (error) {
+      console.error('Move to clients error:', error);
+      setMessage({ type: 'error', text: `Error: ${error.message}. Make sure you're logged in.` });
+    }
   };
 
   const toggleEmbed = (widgetId) => {
     setShowEmbed(prev => ({ ...prev, [widgetId]: !prev[widgetId] }));
+  };
+
+  const toggleAutoDeliver = async (widget) => {
+    try {
+      const newValue = !widget.auto_deliver;
+      const response = await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ auto_deliver: newValue })
+      });
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: `Auto-delivery ${newValue ? 'enabled' : 'disabled'} for ${widget.business_name}` });
+        loadWidgets();
+      } else {
+        setMessage({ type: 'error', text: 'Failed to toggle auto-delivery' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message });
+    }
   };
 
   const getPlanColor = (plan) => {
@@ -442,6 +520,13 @@ export default function WidgetRequests() {
                           Deliver
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant={widget.auto_deliver ? "default" : "outline"}
+                        onClick={() => toggleAutoDeliver(widget)}
+                      >
+                        {widget.auto_deliver ? 'Auto: ON' : 'Auto: OFF'}
+                      </Button>
                       <Button size="sm" variant="outline" onClick={() => startEdit(widget)}>
                         <Edit2 className="h-4 w-4 mr-1" />
                         Edit
