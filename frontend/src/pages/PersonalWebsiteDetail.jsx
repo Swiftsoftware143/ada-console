@@ -296,9 +296,9 @@ export default function PersonalWebsiteDetail() {
               
               {/* Tag dropdown */}
               <Select 
-                value="" 
+                value="__placeholder__" 
                 onValueChange={(val) => {
-                  if (val && val !== "") {
+                  if (val && val !== "__placeholder__") {
                     addTag(val);
                   }
                 }}
@@ -308,14 +308,14 @@ export default function PersonalWebsiteDetail() {
                   <SelectValue placeholder="Select a tag from Tag Manager..." />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1e2130] border-[#2e3245]">
-                  <SelectItem value="" disabled>Select a tag...</SelectItem>
+                  <SelectItem value="__placeholder__" disabled>Select a tag...</SelectItem>
                   {availableTags
                     .filter(t => !getCurrentTags().includes(t))
                     .map((tag) => (
                       <SelectItem key={tag} value={tag}>{tag}</SelectItem>
                     ))}
                   {availableTags.filter(t => !getCurrentTags().includes(t)).length === 0 && (
-                    <SelectItem value="" disabled>All tags already assigned</SelectItem>
+                    <SelectItem value="__empty__" disabled>All tags already assigned</SelectItem>
                   )}
                 </SelectContent>
               </Select>
