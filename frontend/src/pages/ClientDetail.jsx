@@ -129,21 +129,31 @@ export default function ClientDetail({ isPersonal = false }) {
     if (!client) return;
     setSaving(true);
     try {
-      console.log("Saving client via Supabase:", id);
+      console.log("Saving client:", id, "Current tags:", client.tags);
       
-      // Try using Supabase but with minimal fields
-      const { error } = await supabase
+      // Build update payload - match database schema exactly
+      const updateData = {};
+      
+      // Only include fields that are actually set
+      if (client.name) updateData.name = client.name;
+      if (client.domain) updateData.domain = cleanDomain(client.domain);
+      if (client.plan_tier) updateData.plan_tier = client.plan_tier;
+      
+      // Handle tags - can be string or null
+      updateData.tags = client.tags || null;
+      
+      // Optional fields
+      if (client.location !== undefined) updateData.location = client.location || null;
+      if (client.notes !== undefined) updateData.notes = client.notes || null;
+      if (client.active !== undefined) updateData.active = Boolean(client.active);
+      
+      console.log("Update payload:", updateData);
+      
+      const { data, error } = await supabase
         .from(isPersonal ? "personal_websites" : "clients")
-        .update({
-          name: client.name,
-          domain: cleanDomain(client.domain),
-          plan_tier: client.plan_tier,
-          tags: client.tags || null,
-          location: client.location || null,
-          notes: client.notes || null,
-          active: client.active
-        })
-        .eq("id", id);
+        .update(updateData)
+        .eq("id", id)
+        .select();
       
       if (error) {
         console.error("Supabase error:", error);
@@ -152,7 +162,7 @@ export default function ClientDetail({ isPersonal = false }) {
         return;
       }
       
-      console.log("Save successful");
+      console.log("Save successful:", data);
       toast.success("Saved successfully");
     } catch (err) {
       console.error("Save error:", err);
