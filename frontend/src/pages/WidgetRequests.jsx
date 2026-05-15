@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Widget, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Code } from "lucide-react";
+import { Puzzle, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -186,7 +186,7 @@ export default function WidgetRequests() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Widgets" value={stats.total} icon={Widget} />
+        <StatCard title="Total Widgets" value={stats.total} icon={Puzzle} />
         <StatCard title="Pending" value={stats.pending} icon={Clock} />
         <StatCard title="Delivered" value={stats.delivered} icon={CheckCircle} />
         <StatCard title="Auto-Delivery" value={stats.autoDeliver} icon={Send} />
