@@ -25,7 +25,6 @@ import {
 import MasterStatusHero from "@/components/MasterStatusHero";
 import EmbedCodeBlock from "@/components/EmbedCodeBlock";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
-import CategoryManager from "@/components/CategoryManager";
 
 const hydrate = (data) => ({
   ...data,
@@ -40,24 +39,48 @@ export default function PersonalWebsiteDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
-  const [categories, setCategories] = useState(["Ecommerce", "Newsletters", "SaaS"]);
+  const [availableTags, setAvailableTags] = useState([]);
+  const [tagInput, setTagInput] = useState("");
   const [profileFilter, setProfileFilter] = useState("");
   const [featureFilter, setFeatureFilter] = useState("");
 
-  const loadCategories = useCallback(async () => {
+  const loadTags = useCallback(async () => {
     try {
+      // Load from settings first
+      const { data: settingsData } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "tags")
+        .maybeSingle();
+      
+      const allTags = new Set();
+      
+      if (settingsData?.value) {
+        const parsed = typeof settingsData.value === 'string'
+          ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
+          : Array.isArray(settingsData.value) ? settingsData.value : [];
+        parsed.forEach(t => allTags.add(t));
+      }
+      
+      // Also load from existing clients/websites
       const [{ data: clients }, { data: websites }] = await Promise.all([
-        supabase.from("clients").select("category"),
-        supabase.from("personal_websites").select("category"),
+        supabase.from("clients").select("tags"),
+        supabase.from("personal_websites").select("tags"),
       ]);
-      const allCats = new Set(["Ecommerce", "Newsletters", "SaaS"]);
+      
       [...(clients || []), ...(websites || [])].forEach(item => {
-        if (item.category) allCats.add(item.category);
+        if (item.tags) {
+          if (typeof item.tags === 'string') {
+            item.tags.split(',').forEach(t => allTags.add(t.trim()));
+          } else if (Array.isArray(item.tags)) {
+            item.tags.forEach(t => allTags.add(t));
+          }
+        }
       });
-      setCategories(Array.from(allCats).sort());
+      
+      setAvailableTags(Array.from(allTags).sort());
     } catch (err) {
-      console.error("Error loading categories:", err);
+      console.error("Error loading tags:", err);
     }
   }, []);
 
@@ -77,13 +100,13 @@ export default function PersonalWebsiteDetail() {
         return;
       }
       setWebsite(hydrate(data));
-      loadCategories();
+      loadTags();
       setLoading(false);
     })();
     return () => {
       alive = false;
     };
-  }, [id, navigate, loadCategories]);
+  }, [id, navigate, loadTags]);
 
   const update = useCallback(
     (patch) => setWebsite((w) => ({ ...w, ...patch })),
@@ -106,81 +129,92 @@ export default function PersonalWebsiteDetail() {
     []
   );
 
+  const handleSave = useCallback(async () => {
+    if (!website) return;
+    setSaving(true);
+    const { id: _id, created_at, updated_at, ...rest } = website;
+    const { error } = await supabase
+      .from("personal_websites")
+      .update({ ...rest, domain: cleanDomain(rest.domain) })
+      .eq("id", id);
+    setSaving(false);
+    if (error) {
+      toast.error(error.message || "Failed to save");
+      return;
+    }
+    toast.success("Saved successfully");
+  }, [website, id]);
+
+  const handleDelete = useCallback(async () => {
+    const { error } = await supabase
+      .from("personal_websites")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      toast.error("Failed to delete");
+      return;
+    }
+    toast.success("Deleted");
+    navigate("/personal-websites");
+  }, [id, navigate]);
+
+  const handleToggleActive = useCallback(async () => {
+    if (!website) return;
+    const newVal = !website.active;
+    update({ active: newVal });
+    const { error } = await supabase
+      .from("personal_websites")
+      .update({ active: newVal })
+      .eq("id", id);
+    if (error) {
+      toast.error("Failed to update status");
+      update({ active: !newVal });
+      return;
+    }
+    toast.success(newVal ? "Activated" : "Deactivated");
+  }, [website, id, update]);
+
   const embedCode = useMemo(
     () => generateEmbedCode(website?.domain),
     [website?.domain]
   );
 
-  const handleSave = async () => {
-    if (!website) return;
-    if (!website.name?.trim()) return toast.error("Website name is required");
-    if (!website.domain?.trim()) return toast.error("Domain is required");
-
-    setSaving(true);
-    const payload = {
-      name: website.name.trim(),
-      domain: cleanDomain(website.domain),
-      plan_tier: website.plan_tier,
-      category: website.category?.trim() || null,
-      location: website.location?.trim() || null,
-      notes: website.notes?.trim() || null,
-      active: website.active,
-      widget_position: website.widget_position,
-      primary_color: website.primary_color,
-      enabled_profiles: website.enabled_profiles,
-      enabled_features: website.enabled_features,
-    };
-    const { data, error } = await supabase
-      .from("personal_websites")
-      .update(payload)
-      .eq("id", website.id)
-      .select()
-      .single();
-    setSaving(false);
-    if (error) {
-      if (error.code === "23505") toast.error("Another website already uses this domain");
-      else toast.error(error.message || "Failed to save");
-      return;
-    }
-    setWebsite(hydrate(data));
-      loadCategories();
-    toast.success("Changes saved");
-  };
-
-  const handleToggleActive = async (val) => {
-    update({ active: val });
-    const { error } = await supabase
-      .from("personal_websites")
-      .update({ active: val })
-      .eq("id", website.id);
-    if (error) {
-      toast.error("Failed to update widget status");
-      update({ active: !val });
-      return;
-    }
-    toast.success(val ? "Widget activated" : "Widget deactivated");
-  };
-
-  const handleDelete = async () => {
-    const { error } = await supabase.from("personal_websites").delete().eq("id", website.id);
-    if (error) {
-      toast.error("Failed to delete");
-      return;
-    }
-    toast.success(`${website.name} deleted`);
-    navigate("/personal-websites");
-  };
-
   if (loading || !website) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] text-[#64748b] text-sm" data-testid="detail-loading">
-        <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Loading website...
+      <div data-testid="website-detail-loading" className="p-10 text-center text-[#64748b]">
+        <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+        Loading...
       </div>
     );
   }
 
+  // Helper to get current tags array
+  const getCurrentTags = () => {
+    if (!website.tags) return [];
+    if (typeof website.tags === 'string') {
+      return website.tags.split(',').map(t => t.trim()).filter(Boolean);
+    }
+    if (Array.isArray(website.tags)) return website.tags;
+    return [];
+  };
+
+  // Helper to add a tag
+  const addTag = (tag) => {
+    const current = getCurrentTags();
+    if (!current.includes(tag)) {
+      update({ tags: [...current, tag].join(', ') });
+    }
+  };
+
+  // Helper to remove a tag
+  const removeTag = (idx) => {
+    const current = getCurrentTags();
+    const newTags = current.filter((_, i) => i !== idx);
+    update({ tags: newTags.join(', ') });
+  };
+
   return (
-    <div data-testid="personal-website-detail-page" className="pb-12">
+    <div data-testid="website-detail-page" className="pb-12">
       {/* Top bar */}
       <div className="flex items-center justify-between mb-6">
         <Link
@@ -188,17 +222,9 @@ export default function PersonalWebsiteDetail() {
           data-testid="back-to-websites-link"
           className="inline-flex items-center gap-1.5 text-sm text-[#94a3b8] hover:text-white transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to my websites
+          <ArrowLeft className="h-4 w-4" /> Back to websites
         </Link>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setCategoryManagerOpen(true)}
-            className="border-[#2e3245] text-[#94a3b8] hover:text-white hover:border-[#3e445e]"
-          >
-            <Tag className="h-4 w-4 mr-2" />
-            Categories
-          </Button>
           <Button
             variant="ghost"
             data-testid="header-delete-btn"
@@ -243,22 +269,81 @@ export default function PersonalWebsiteDetail() {
                 Stored cleanly on save (no https://, www., or trailing /).
               </p>
             </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Category">
-                <Input
-                  data-testid="field-category"
-                  value={website.category || ""}
-                  onChange={(e) => update({ category: e.target.value })}
-                  placeholder="Type new or existing category..."
-                  list="category-suggestions"
-                  className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
-                />
-                <datalist id="category-suggestions">
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat} />
+            
+            {/* Tags Field */}
+            <Field label="Tags">
+              <div className="flex flex-wrap gap-2 mb-2">
+                {getCurrentTags().map((tag, idx) => (
+                  <span 
+                    key={idx} 
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-[#007bff]/20 text-[#007bff] rounded text-xs"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(idx)}
+                      className="hover:text-white"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+              
+              {/* Quick-add from existing tags */}
+              <div className="flex flex-wrap gap-1 mb-2">
+                {availableTags
+                  .filter(t => !getCurrentTags().includes(t))
+                  .slice(0, 8)
+                  .map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => addTag(tag)}
+                      className="px-2 py-1 bg-[#2e3245] text-[#94a3b8] rounded text-xs hover:bg-[#007bff]/20 hover:text-[#007bff]"
+                    >
+                      + {tag}
+                    </button>
                   ))}
-                </datalist>
-              </Field>
+              </div>
+              
+              {/* Add custom tag */}
+              <div className="flex gap-2">
+                <Input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (tagInput.trim()) {
+                        addTag(tagInput.trim());
+                        setTagInput("");
+                      }
+                    }
+                  }}
+                  placeholder="Add custom tag..."
+                  className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b]"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (tagInput.trim()) {
+                      addTag(tagInput.trim());
+                      setTagInput("");
+                    }
+                  }}
+                  className="bg-transparent border-[#2e3245] text-white hover:bg-[#1a1d27]"
+                >
+                  Add
+                </Button>
+              </div>
+              <p className="text-xs text-[#64748b] mt-1">
+                Click quick tags or type custom. Manage all tags in Settings → Tag Manager.
+              </p>
+            </Field>
+
+            <div className="grid grid-cols-2 gap-4">
               <Field label="Location">
                 <Input
                   data-testid="field-location"
@@ -268,32 +353,32 @@ export default function PersonalWebsiteDetail() {
                   className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
                 />
               </Field>
-            </div>
-            <Field label="Plan Tier">
-              <Select
-                value={website.plan_tier}
-                onValueChange={(v) => update({ plan_tier: v })}
-              >
-                <SelectTrigger
-                  data-testid="field-plan-trigger"
-                  className="bg-[#0f1117] border-[#2e3245] text-white focus:ring-[#007bff]"
+              <Field label="Plan Tier">
+                <Select
+                  value={website.plan_tier}
+                  onValueChange={(v) => update({ plan_tier: v })}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1e2130] border-[#2e3245] text-white">
-                  <SelectItem value="basic">Basic</SelectItem>
-                  <SelectItem value="pro">Pro</SelectItem>
-                  <SelectItem value="enterprise">Enterprise</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
+                  <SelectTrigger
+                    data-testid="field-plan-trigger"
+                    className="bg-[#0f1117] border-[#2e3245] text-white focus:ring-[#007bff]"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1e2130] border-[#2e3245] text-white">
+                    <SelectItem value="basic">Basic</SelectItem>
+                    <SelectItem value="pro">Pro</SelectItem>
+                    <SelectItem value="enterprise">Enterprise</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
             <Field label="Internal Notes">
               <Textarea
                 data-testid="field-notes"
                 value={website.notes || ""}
                 onChange={(e) => update({ notes: e.target.value })}
                 rows={3}
-                placeholder="Anything you should know about this website..."
+                placeholder="Anything your team should know about this website..."
                 className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent resize-none"
               />
             </Field>
@@ -364,7 +449,7 @@ export default function PersonalWebsiteDetail() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {Object.entries(PROFILE_LABELS)
-                .filter(([key, label]) => 
+                .filter(([key, label]) =>
                   label.toLowerCase().includes(profileFilter.toLowerCase()) ||
                   key.toLowerCase().includes(profileFilter.toLowerCase())
                 )
@@ -464,12 +549,6 @@ export default function PersonalWebsiteDetail() {
         onOpenChange={setDeleteOpen}
         onConfirm={handleDelete}
         clientName={website.name}
-      />
-
-      <CategoryManager
-        open={categoryManagerOpen}
-        onOpenChange={setCategoryManagerOpen}
-        onCategoriesChange={loadCategories}
       />
     </div>
   );
