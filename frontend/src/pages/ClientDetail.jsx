@@ -129,52 +129,25 @@ export default function ClientDetail({ isPersonal = false }) {
     if (!client) return;
     setSaving(true);
     try {
-      // Build payload with only defined values to avoid sending null/undefined
-      const payload = {};
+      console.log("Saving client via Supabase:", id);
       
-      if (client.name !== undefined) payload.name = client.name;
-      if (client.domain !== undefined) payload.domain = cleanDomain(client.domain);
-      if (client.plan_tier !== undefined) payload.plan_tier = client.plan_tier;
-      // Tags should be null if empty string, not empty string
-      if (client.tags !== undefined) payload.tags = client.tags || null;
-      if (client.location !== undefined) payload.location = client.location || null;
-      if (client.notes !== undefined) payload.notes = client.notes || null;
-      if (client.active !== undefined) payload.active = client.active;
-      if (client.widget_position !== undefined) payload.widget_position = client.widget_position;
-      if (client.primary_color !== undefined) payload.primary_color = client.primary_color;
+      // Try using Supabase but with minimal fields
+      const { error } = await supabase
+        .from(isPersonal ? "personal_websites" : "clients")
+        .update({
+          name: client.name,
+          domain: cleanDomain(client.domain),
+          plan_tier: client.plan_tier,
+          tags: client.tags || null,
+          location: client.location || null,
+          notes: client.notes || null,
+          active: client.active
+        })
+        .eq("id", id);
       
-      // JSONB fields - ensure they're objects
-      payload.enabled_profiles = client.enabled_profiles || DEFAULT_PROFILES;
-      payload.enabled_features = client.enabled_features || DEFAULT_FEATURES;
-      
-      console.log("Saving client:", id, payload);
-      
-      // Use fetch directly to avoid Supabase body stream issue
-      const tableName = isPersonal ? "personal_websites" : "clients";
-      const url = `${process.env.REACT_APP_SUPABASE_URL}/rest/v1/${tableName}?id=eq.${id}`;
-      
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!response.ok) {
-        // Clone response before reading to avoid body stream issues
-        let errorText = 'Unknown error';
-        try {
-          const clonedResponse = response.clone();
-          errorText = await clonedResponse.text();
-        } catch (e) {
-          errorText = `HTTP ${response.status}`;
-        }
-        console.error("Save failed:", response.status, errorText);
-        toast.error(`Save failed: ${response.status}`);
+      if (error) {
+        console.error("Supabase error:", error);
+        toast.error(error.message || "Failed to save");
         setSaving(false);
         return;
       }
