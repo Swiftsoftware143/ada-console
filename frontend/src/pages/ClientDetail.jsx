@@ -167,8 +167,21 @@ export default function ClientDetail({ isPersonal = false }) {
       console.log("Response status:", response.status);
       
       if (!response.ok) {
-        console.error("Save failed with status:", response.status);
-        toast.error(`Save failed: ${response.status}`);
+        // Try to get error details from response
+        let errorDetails = '';
+        try {
+          const errorData = await response.json();
+          errorDetails = JSON.stringify(errorData);
+          console.error("Save failed with error:", errorData);
+        } catch (e) {
+          try {
+            errorDetails = await response.text();
+            console.error("Save failed with text:", errorDetails);
+          } catch (e2) {
+            errorDetails = 'Could not read error details';
+          }
+        }
+        toast.error(`Save failed: ${response.status} - ${errorDetails.substring(0, 200)}`);
         setSaving(false);
         return;
       }
