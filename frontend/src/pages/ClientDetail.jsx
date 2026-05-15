@@ -129,12 +129,26 @@ export default function ClientDetail({ isPersonal = false }) {
     if (!client) return;
     setSaving(true);
     try {
-      const { id: _id, created_at, updated_at, ...rest } = client;
-      console.log("Saving client:", id, rest);
-      const { error } = await supabase
+      // Only send fields that exist in the database
+      const payload = {
+        name: client.name,
+        domain: cleanDomain(client.domain),
+        plan_tier: client.plan_tier,
+        tags: client.tags,
+        location: client.location,
+        notes: client.notes,
+        active: client.active,
+        widget_position: client.widget_position,
+        primary_color: client.primary_color,
+        enabled_profiles: client.enabled_profiles,
+        enabled_features: client.enabled_features,
+      };
+      console.log("Saving client:", id, payload);
+      const { data, error } = await supabase
         .from(isPersonal ? "personal_websites" : "clients")
-        .update({ ...rest, domain: cleanDomain(rest.domain) })
-        .eq("id", id);
+        .update(payload)
+        .eq("id", id)
+        .select();
       
       if (error) {
         console.error("Supabase error:", error);
@@ -142,6 +156,7 @@ export default function ClientDetail({ isPersonal = false }) {
         setSaving(false);
         return;
       }
+      console.log("Save successful:", data);
       toast.success("Saved successfully");
     } catch (err) {
       console.error("Save error:", err);
