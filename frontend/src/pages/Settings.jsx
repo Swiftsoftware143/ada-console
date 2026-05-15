@@ -115,7 +115,7 @@ export default function Settings() {
         </CardContent>
       </Card>
       
-      <CategoryManagerCard />
+      <TagManagerCard />
     </div>
   );
 }

@@ -37,7 +37,7 @@ import { toast } from "sonner";
 const COLUMNS = [
   { key: "name", label: "Client Name" },
   { key: "domain", label: "Domain" },
-  { key: "category", label: "Category" },
+  { key: "tags", label: "Tags" },
   { key: "location", label: "Location" },
   { key: "plan_tier", label: "Plan Tier" },
   { key: "active", label: "Status" },
