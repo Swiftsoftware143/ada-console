@@ -31,7 +31,7 @@ import StatusBadge from "@/components/StatusBadge";
 import PageHeader from "@/components/PageHeader";
 import ClientFormModal from "@/components/ClientFormModal";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
-import CategoryManager from "@/components/CategoryManager";
+
 import { toast } from "sonner";
 
 const COLUMNS = [
@@ -56,17 +56,33 @@ export default function Clients() {
   const [sortKey, setSortKey] = useState("created_at");
   const [sortDir, setSortDir] = useState("desc");
   const [addOpen, setAddOpen] = useState(false);
-  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+
   const [toDelete, setToDelete] = useState(null);
   const navigate = useNavigate();
 
   const loadFilters = useCallback(async () => {
+    // Load tags from settings (Tag Manager) first
+    const { data: settingsData } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "tags")
+      .maybeSingle();
+    
+    const allTags = new Set();
+    
+    if (settingsData?.value) {
+      const parsed = typeof settingsData.value === 'string'
+        ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
+        : Array.isArray(settingsData.value) ? settingsData.value : [];
+      parsed.forEach(t => allTags.add(t));
+    }
+    
+    // Also load from existing clients/websites
     const [{ data: clientsData }, { data: websitesData }] = await Promise.all([
       supabase.from("clients").select("tags,location"),
       supabase.from("personal_websites").select("tags,location"),
     ]);
     
-    const allTags = new Set();
     const allLocs = new Set();
     [...(clientsData || []), ...(websitesData || [])].forEach(item => {
       // Parse tags (comma-separated or array)
@@ -322,14 +338,7 @@ export default function Clients() {
         subtitle="Manage every client deploying the SwiftImpact ADA widget."
         actions={
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setCategoryManagerOpen(true)}
-              className="border-[#2e3245] text-[#94a3b8] hover:text-white hover:border-[#3e445e]"
-            >
-              <Tag className="h-4 w-4 mr-2" />
-              Tags
-            </Button>
+
             <Button
               data-testid="add-new-client-btn"
               onClick={() => setAddOpen(true)}
@@ -417,11 +426,7 @@ export default function Clients() {
       </div>
 
       <ClientFormModal open={addOpen} onOpenChange={setAddOpen} onCreated={() => { console.log("Client created, refreshing..."); load(); }} />
-      <CategoryManager 
-        open={categoryManagerOpen} 
-        onOpenChange={setCategoryManagerOpen} 
-        onCategoriesChange={loadFilters}
-      />
+
       <DeleteConfirmModal
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}

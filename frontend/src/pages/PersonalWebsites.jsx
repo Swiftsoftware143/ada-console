@@ -60,12 +60,28 @@ export default function PersonalWebsites() {
   const navigate = useNavigate();
 
   const loadFilters = useCallback(async () => {
+    // Load tags from settings (Tag Manager) first
+    const { data: settingsData } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "tags")
+      .maybeSingle();
+    
+    const allTags = new Set();
+    
+    if (settingsData?.value) {
+      const parsed = typeof settingsData.value === 'string'
+        ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
+        : Array.isArray(settingsData.value) ? settingsData.value : [];
+      parsed.forEach(t => allTags.add(t));
+    }
+    
+    // Also load from existing clients/websites
     const [{ data: clientsData }, { data: websitesData }] = await Promise.all([
       supabase.from("clients").select("tags,location"),
       supabase.from("personal_websites").select("tags,location"),
     ]);
     
-    const allTags = new Set();
     const allLocs = new Set();
     [...(clientsData || []), ...(websitesData || [])].forEach(item => {
       // Parse tags (comma-separated or array)
