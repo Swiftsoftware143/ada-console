@@ -147,11 +147,10 @@ export default function ClientDetail({ isPersonal = false }) {
       payload.enabled_features = client.enabled_features || DEFAULT_FEATURES;
       
       console.log("Saving client:", id, payload);
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from(isPersonal ? "personal_websites" : "clients")
         .update(payload)
-        .eq("id", id)
-        .select();
+        .eq("id", id);
       
       if (error) {
         console.error("Supabase error details:", JSON.stringify(error, null, 2));
@@ -159,7 +158,7 @@ export default function ClientDetail({ isPersonal = false }) {
         setSaving(false);
         return;
       }
-      console.log("Save successful:", data);
+      console.log("Save successful");
       toast.success("Saved successfully");
     } catch (err) {
       console.error("Save error:", err);
