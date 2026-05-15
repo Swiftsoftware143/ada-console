@@ -128,17 +128,26 @@ export default function ClientDetail({ isPersonal = false }) {
   const handleSave = useCallback(async () => {
     if (!client) return;
     setSaving(true);
-    const { id: _id, created_at, updated_at, ...rest } = client;
-    const { error } = await supabase
-      .from(isPersonal ? "personal_websites" : "clients")
-      .update({ ...rest, domain: cleanDomain(rest.domain) })
-      .eq("id", id);
-    setSaving(false);
-    if (error) {
-      toast.error(error.message || "Failed to save");
-      return;
+    try {
+      const { id: _id, created_at, updated_at, ...rest } = client;
+      console.log("Saving client:", id, rest);
+      const { error } = await supabase
+        .from(isPersonal ? "personal_websites" : "clients")
+        .update({ ...rest, domain: cleanDomain(rest.domain) })
+        .eq("id", id);
+      
+      if (error) {
+        console.error("Supabase error:", error);
+        toast.error(error.message || "Failed to save");
+        setSaving(false);
+        return;
+      }
+      toast.success("Saved successfully");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Save failed: " + err.message);
     }
-    toast.success("Saved successfully");
+    setSaving(false);
   }, [client, id, isPersonal]);
 
   const handleDelete = useCallback(async () => {
