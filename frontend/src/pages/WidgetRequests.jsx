@@ -180,7 +180,7 @@ export default function WidgetRequests() {
         body: JSON.stringify({ 
           embed_code: embedCode,
           status: 'delivered',
-          delivered_at: new Date().toISOString()
+          delivered_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
         })
       });
 
