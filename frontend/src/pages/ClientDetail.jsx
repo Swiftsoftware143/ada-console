@@ -129,20 +129,23 @@ export default function ClientDetail({ isPersonal = false }) {
     if (!client) return;
     setSaving(true);
     try {
-      // Only send fields that exist in the database
-      const payload = {
-        name: client.name,
-        domain: cleanDomain(client.domain),
-        plan_tier: client.plan_tier,
-        tags: client.tags,
-        location: client.location,
-        notes: client.notes,
-        active: client.active,
-        widget_position: client.widget_position,
-        primary_color: client.primary_color,
-        enabled_profiles: client.enabled_profiles,
-        enabled_features: client.enabled_features,
-      };
+      // Build payload with only defined values to avoid sending null/undefined
+      const payload = {};
+      
+      if (client.name !== undefined) payload.name = client.name;
+      if (client.domain !== undefined) payload.domain = cleanDomain(client.domain);
+      if (client.plan_tier !== undefined) payload.plan_tier = client.plan_tier;
+      if (client.tags !== undefined) payload.tags = client.tags;
+      if (client.location !== undefined) payload.location = client.location;
+      if (client.notes !== undefined) payload.notes = client.notes;
+      if (client.active !== undefined) payload.active = client.active;
+      if (client.widget_position !== undefined) payload.widget_position = client.widget_position;
+      if (client.primary_color !== undefined) payload.primary_color = client.primary_color;
+      
+      // JSONB fields - ensure they're objects
+      payload.enabled_profiles = client.enabled_profiles || DEFAULT_PROFILES;
+      payload.enabled_features = client.enabled_features || DEFAULT_FEATURES;
+      
       console.log("Saving client:", id, payload);
       const { data, error } = await supabase
         .from(isPersonal ? "personal_websites" : "clients")
@@ -151,7 +154,7 @@ export default function ClientDetail({ isPersonal = false }) {
         .select();
       
       if (error) {
-        console.error("Supabase error:", error);
+        console.error("Supabase error details:", JSON.stringify(error, null, 2));
         toast.error(error.message || "Failed to save");
         setSaving(false);
         return;
