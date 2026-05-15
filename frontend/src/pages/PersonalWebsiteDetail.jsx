@@ -272,7 +272,8 @@ export default function PersonalWebsiteDetail() {
             
             {/* Tags Field */}
             <Field label="Tags">
-              <div className="flex flex-wrap gap-2 mb-2">
+              {/* Current tags display */}
+              <div className="flex flex-wrap gap-2 mb-3">
                 {getCurrentTags().map((tag, idx) => (
                   <span 
                     key={idx} 
@@ -288,27 +289,39 @@ export default function PersonalWebsiteDetail() {
                     </button>
                   </span>
                 ))}
+                {getCurrentTags().length === 0 && (
+                  <span className="text-xs text-[#64748b]">No tags assigned</span>
+                )}
               </div>
               
-              {/* Quick-add from existing tags */}
-              <div className="flex flex-wrap gap-1 mb-2">
-                {availableTags
-                  .filter(t => !getCurrentTags().includes(t))
-                  .slice(0, 8)
-                  .map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => addTag(tag)}
-                      className="px-2 py-1 bg-[#2e3245] text-[#94a3b8] rounded text-xs hover:bg-[#007bff]/20 hover:text-[#007bff]"
-                    >
-                      + {tag}
-                    </button>
-                  ))}
-              </div>
+              {/* Tag dropdown */}
+              <Select 
+                value="" 
+                onValueChange={(val) => {
+                  if (val && val !== "") {
+                    addTag(val);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full bg-[#0f1117] border-[#2e3245] text-white">
+                  <Tag className="h-4 w-4 mr-2 text-[#64748b]" />
+                  <SelectValue placeholder="Select a tag from Tag Manager..." />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1e2130] border-[#2e3245]">
+                  <SelectItem value="" disabled>Select a tag...</SelectItem>
+                  {availableTags
+                    .filter(t => !getCurrentTags().includes(t))
+                    .map((tag) => (
+                      <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                    ))}
+                  {availableTags.filter(t => !getCurrentTags().includes(t)).length === 0 && (
+                    <SelectItem value="" disabled>All tags already assigned</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
               
               {/* Add custom tag */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 mt-3">
                 <Input
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
@@ -321,7 +334,7 @@ export default function PersonalWebsiteDetail() {
                       }
                     }
                   }}
-                  placeholder="Add custom tag..."
+                  placeholder="Or type a new custom tag..."
                   className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b]"
                 />
                 <Button
@@ -338,8 +351,8 @@ export default function PersonalWebsiteDetail() {
                   Add
                 </Button>
               </div>
-              <p className="text-xs text-[#64748b] mt-1">
-                Click quick tags or type custom. Manage all tags in Settings → Tag Manager.
+              <p className="text-xs text-[#64748b] mt-2">
+                Select from Tag Manager or create custom tags. Manage all tags in Settings → Tag Manager.
               </p>
             </Field>
 
