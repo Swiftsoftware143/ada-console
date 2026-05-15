@@ -307,7 +307,7 @@ export default function WidgetRequests() {
           <div className="space-y-4">
             {widgets.map((widget) => (
               <div 
-                key={widget.widget_id}
+                key={widget.id}
                 className="border border-[#334155] rounded-lg p-4 hover:border-[#4ade80] transition-colors bg-[#0f172a]"
               >
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -328,10 +328,10 @@ export default function WidgetRequests() {
                       {widget.contact_name} • {widget.contact_email} • {widget.domain}
                     </p>
                     <p className="text-xs text-[#94a3b8] mt-1">
-                      Widget ID: {widget.widget_id.substring(0, 16)}...
+                      Widget ID: {widget.widget_id ? widget.widget_id.substring(0, 16) : 'N/A'}...
                     </p>
                     
-                    {showEmbed[widget.widget_id] && (
+                    {showEmbed[widget.id] && (
                       <pre className="mt-3 p-3 bg-[#0f172a] text-[#4ade80] rounded-lg text-xs overflow-x-auto border border-[#334155]">
                         {widget.embed_code || 'No embed code generated yet'}
                       </pre>
@@ -342,7 +342,7 @@ export default function WidgetRequests() {
                     {widget.status !== 'delivered' && (
                       <Button
                         size="sm"
-                        onClick={() => deliverWidget(widget.widget_id)}
+                        onClick={() => deliverWidget(widget.id)}
                       >
                         <Send className="h-4 w-4 mr-1" />
                         Deliver Now
@@ -362,10 +362,10 @@ export default function WidgetRequests() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => toggleEmbed(widget.widget_id)}
+                      onClick={() => toggleEmbed(widget.id)}
                     >
                       <Code className="h-4 w-4 mr-1" />
-                      {showEmbed[widget.widget_id] ? 'Hide Code' : 'View Code'}
+                      {showEmbed[widget.id] ? 'Hide Code' : 'View Code'}
                     </Button>
                   </div>
                 </div>
