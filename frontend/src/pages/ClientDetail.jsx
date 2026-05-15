@@ -165,9 +165,16 @@ export default function ClientDetail({ isPersonal = false }) {
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
+        // Clone response before reading to avoid body stream issues
+        let errorText = 'Unknown error';
+        try {
+          const clonedResponse = response.clone();
+          errorText = await clonedResponse.text();
+        } catch (e) {
+          errorText = `HTTP ${response.status}`;
+        }
         console.error("Save failed:", response.status, errorText);
-        toast.error(`Save failed: ${response.status} - ${errorText}`);
+        toast.error(`Save failed: ${response.status}`);
         setSaving(false);
         return;
       }
