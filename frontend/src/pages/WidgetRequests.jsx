@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { Puzzle, Send, Clock, CheckCircle, AlertCircle, Code, Trash2, Edit2, Move } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +12,6 @@ import StatusBadge from "@/components/StatusBadge";
 const NOCODEBACKEND_API_KEY = '3a8c4c52bfafbe26fe25ca473f8a25bbea6c66448a6dfef2bab6fe8a67ef';
 const NOCODEBACKEND_BASE = 'https://openapi.nocodebackend.com';
 const INSTANCE = '54738_ada_swift';
-const WEBHOOK_SERVER = 'https://43ce-187-124-147-183.ngrok-free.app';
 
 export default function WidgetRequests() {
   const [widgets, setWidgets] = useState([]);
@@ -84,7 +82,6 @@ export default function WidgetRequests() {
     }
 
     try {
-      // Create widget directly in NoCodeBackend (bypass CORS webhook issue)
       const widget_id = crypto.randomUUID();
       const submitData = {
         business_name: String(formData.business_name || ''),
@@ -108,13 +105,11 @@ export default function WidgetRequests() {
       const result = await response.json();
       console.log('Create result:', result);
 
-      // NoCodeBackend returns { status: 'success', message: '...', id: number }
       const recordId = result.id;
       
       if (result.status === 'success' && recordId) {
-        // If auto-deliver is enabled, generate embed code and mark delivered
         if (formData.auto_deliver) {
-          const embedCode = `<!-- ADA Swift Widget - ${formData.plan_tier.toUpperCase()} Plan -->\n<!-- Domain: ${formData.domain} -->\n<!-- Widget ID: ${widget_id} -->\n<script>!function(){var s=document.createElement("script");s.src="https://adaswift.netlify.app/loader.js";s.setAttribute("data-domain","${formData.domain}");s.async=!0;document.body.appendChild(s)}();</script>\n<!-- End ADA Swift Widget -->`;
+          const embedCode = generateEmbedCode(widget_id, formData.domain, formData.plan_tier);
           
           const updateResponse = await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${recordId}?Instance=${INSTANCE}`, {
             method: 'PUT',
@@ -129,13 +124,12 @@ export default function WidgetRequests() {
             })
           });
           
-          const updateResult = await updateResponse.json();
-          console.log('Update result:', updateResult);
-          
           if (updateResponse.ok) {
             setMessage({ type: 'success', text: `Widget created and delivered! ID: ${widget_id.substring(0,8)}...` });
           } else {
-            setMessage({ type: 'warning', text: `Widget created but delivery failed: ${updateResult.message || 'Unknown error'}` });
+            const errorText = await updateResponse.text();
+            console.error('Update failed:', errorText);
+            setMessage({ type: 'warning', text: `Widget created but delivery failed` });
           }
         } else {
           setMessage({ type: 'success', text: `Widget created! ID: ${widget_id.substring(0,8)}... (Manual review)` });
@@ -161,9 +155,18 @@ export default function WidgetRequests() {
     }
   };
 
+  const generateEmbedCode = (widget_id, domain, plan_tier) => {
+    const tier = (plan_tier || 'basic').toUpperCase();
+    return `<!-- ADA Swift Widget - ${tier} Plan -->
+<!-- Domain: ${domain} -->
+<!-- Widget ID: ${widget_id} -->
+<script>!function(){var s=document.createElement("script");s.src="https://adaswift.netlify.app/loader.js";s.setAttribute("data-domain","${domain}");s.async=!0;document.body.appendChild(s)}();</script>
+<!-- End ADA Swift Widget -->`;
+  };
+
   const deliverWidget = async (widget) => {
     try {
-      const embedCode = `<!-- ADA Swift Widget - ${(widget.plan_tier || 'basic').toUpperCase()} Plan -->\n<!-- Domain: ${widget.domain} -->\n<!-- Widget ID: ${widget.widget_id} -->\n<script>!function(){var s=document.createElement("script");s.src="https://adaswift.netlify.app/loader.js";s.setAttribute("data-domain","${widget.domain}");s.async=!0;document.body.appendChild(s)}();</script>\n<!-- End ADA Swift Widget -->`;
+      const embedCode = generateEmbedCode(widget.widget_id, widget.domain, widget.plan_tier);
       
       const response = await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
         method: 'PUT',
@@ -178,14 +181,13 @@ export default function WidgetRequests() {
         })
       });
 
-      const result = await response.json();
-      console.log('Deliver result:', result);
-
-      if (response.ok && result.status === 'success') {
+      if (response.ok) {
         setMessage({ type: 'success', text: 'Widget delivered! Embed code generated.' });
         loadWidgets();
       } else {
-        setMessage({ type: 'error', text: `Delivery failed: ${result.message || 'Unknown error'}` });
+        const errorText = await response.text();
+        console.error('Deliver failed:', errorText);
+        setMessage({ type: 'error', text: 'Delivery failed. Check console.' });
       }
     } catch (error) {
       console.error('Deliver error:', error);
@@ -251,10 +253,9 @@ export default function WidgetRequests() {
   };
 
   const moveToClients = async (widget) => {
-    if (!window.confirm(`Move "${widget.business_name}" to Clients?\n\nThis will create a client record in the main Clients tab.`)) return;
+    if (!window.confirm(`Move "${widget.business_name}" to Clients?`)) return;
     
     try {
-      // Import supabase dynamically to avoid issues if not available
       const { supabase } = await import('@/lib/supabase');
       
       const { data, error } = await supabase
@@ -262,21 +263,19 @@ export default function WidgetRequests() {
         .insert([{
           name: widget.business_name,
           domain: widget.domain,
-          contact_email: widget.contact_email,
-          contact_name: widget.contact_name,
           plan_tier: widget.plan_tier || 'basic',
           category: 'Widget Request',
-          active: true,
-          created_at: new Date().toISOString()
+          active: false,
+          created_at: new Date().toISOString(),
+          notes: `Contact: ${widget.contact_name} (${widget.contact_email})`
         }])
         .select();
       
       if (error) {
         console.error('Supabase error:', error);
-        setMessage({ type: 'error', text: `Failed to move to clients: ${error.message}` });
+        setMessage({ type: 'error', text: `Failed: ${error.message}` });
       } else {
-        setMessage({ type: 'success', text: `Moved to Clients! Client ID: ${data?.[0]?.id}` });
-        // Optionally update widget status to mark as moved
+        setMessage({ type: 'success', text: `Moved to Clients! ID: ${data?.[0]?.id}` });
         await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
           method: 'PUT',
           headers: {
@@ -288,36 +287,13 @@ export default function WidgetRequests() {
         loadWidgets();
       }
     } catch (error) {
-      console.error('Move to clients error:', error);
-      setMessage({ type: 'error', text: `Error: ${error.message}. Make sure you're logged in.` });
+      console.error('Move error:', error);
+      setMessage({ type: 'error', text: error.message });
     }
   };
 
   const toggleEmbed = (widgetId) => {
     setShowEmbed(prev => ({ ...prev, [widgetId]: !prev[widgetId] }));
-  };
-
-  const toggleAutoDeliver = async (widget) => {
-    try {
-      const newValue = !widget.auto_deliver;
-      const response = await fetch(`${NOCODEBACKEND_BASE}/update/ada_widget_requests/${widget.id}?Instance=${INSTANCE}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${NOCODEBACKEND_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ auto_deliver: newValue })
-      });
-
-      if (response.ok) {
-        setMessage({ type: 'success', text: `Auto-delivery ${newValue ? 'enabled' : 'disabled'} for ${widget.business_name}` });
-        loadWidgets();
-      } else {
-        setMessage({ type: 'error', text: 'Failed to toggle auto-delivery' });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message });
-    }
   };
 
   const getPlanColor = (plan) => {
@@ -346,6 +322,8 @@ export default function WidgetRequests() {
           <div className={`mb-4 p-4 rounded-lg ${
             message.type === 'success' 
               ? 'bg-green-900/30 text-green-400 border border-green-700' 
+              : message.type === 'warning'
+              ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-700'
               : 'bg-red-900/30 text-red-400 border border-red-700'
           }`}>
             {message.text}
@@ -361,7 +339,7 @@ export default function WidgetRequests() {
                 onChange={(e) => setFormData({...formData, business_name: e.target.value})}
                 placeholder="Acme Corporation"
                 required
-                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0] placeholder:text-[#64748b]"
+                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]"
               />
             </div>
             <div className="space-y-2">
@@ -371,7 +349,7 @@ export default function WidgetRequests() {
                 onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
                 placeholder="John Doe"
                 required
-                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0] placeholder:text-[#64748b]"
+                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]"
               />
             </div>
             <div className="space-y-2">
@@ -382,7 +360,7 @@ export default function WidgetRequests() {
                 onChange={(e) => setFormData({...formData, contact_email: e.target.value})}
                 placeholder="john@acme.com"
                 required
-                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0] placeholder:text-[#64748b]"
+                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]"
               />
             </div>
             <div className="space-y-2">
@@ -392,15 +370,12 @@ export default function WidgetRequests() {
                 onChange={(e) => setFormData({...formData, domain: e.target.value})}
                 placeholder="acme.com"
                 required
-                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0] placeholder:text-[#64748b]"
+                className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]"
               />
             </div>
             <div className="space-y-2">
               <Label className="text-[#e2e8f0]">Plan Tier</Label>
-              <Select 
-                value={formData.plan_tier}
-                onValueChange={(value) => setFormData({...formData, plan_tier: value})}
-              >
+              <Select value={formData.plan_tier} onValueChange={(v) => setFormData({...formData, plan_tier: v})}>
                 <SelectTrigger className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]">
                   <SelectValue />
                 </SelectTrigger>
@@ -417,7 +392,7 @@ export default function WidgetRequests() {
                 id="auto_deliver"
                 checked={formData.auto_deliver}
                 onChange={(e) => setFormData({...formData, auto_deliver: e.target.checked})}
-                className="w-5 h-5 rounded border-[#334155] bg-[#0f172a] text-[#4ade80] focus:ring-[#4ade80]"
+                className="w-5 h-5 rounded border-[#334155] bg-[#0f172a] text-[#4ade80]"
               />
               <Label htmlFor="auto_deliver" className="cursor-pointer text-[#e2e8f0]">Auto-deliver widget</Label>
             </div>
@@ -441,44 +416,25 @@ export default function WidgetRequests() {
         ) : (
           <div className="space-y-4">
             {widgets.map((widget) => (
-              <div 
-                key={widget.id}
-                className="border border-[#334155] rounded-lg p-4 hover:border-[#4ade80] transition-colors bg-[#0f172a]"
-              >
+              <div key={widget.id} className="border border-[#334155] rounded-lg p-4 bg-[#0f172a]">
                 {editingWidget === widget.id ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-[#e2e8f0]">Business Name</Label>
-                        <Input
-                          value={editFormData.business_name}
-                          onChange={(e) => setEditFormData({...editFormData, business_name: e.target.value})}
-                          className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]"
-                        />
+                        <Input value={editFormData.business_name} onChange={(e) => setEditFormData({...editFormData, business_name: e.target.value})} className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]" />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-[#e2e8f0]">Contact Name</Label>
-                        <Input
-                          value={editFormData.contact_name}
-                          onChange={(e) => setEditFormData({...editFormData, contact_name: e.target.value})}
-                          className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]"
-                        />
+                        <Input value={editFormData.contact_name} onChange={(e) => setEditFormData({...editFormData, contact_name: e.target.value})} className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]" />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-[#e2e8f0]">Contact Email</Label>
-                        <Input
-                          value={editFormData.contact_email}
-                          onChange={(e) => setEditFormData({...editFormData, contact_email: e.target.value})}
-                          className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]"
-                        />
+                        <Input value={editFormData.contact_email} onChange={(e) => setEditFormData({...editFormData, contact_email: e.target.value})} className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]" />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-[#e2e8f0]">Domain</Label>
-                        <Input
-                          value={editFormData.domain}
-                          onChange={(e) => setEditFormData({...editFormData, domain: e.target.value})}
-                          className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]"
-                        />
+                        <Input value={editFormData.domain} onChange={(e) => setEditFormData({...editFormData, domain: e.target.value})} className="bg-[#0f172a] border-[#334155] text-[#e2e8f0]" />
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -489,55 +445,49 @@ export default function WidgetRequests() {
                 ) : (
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h4 className="font-semibold text-[#e2e8f0]">{widget.business_name}</h4>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPlanColor(widget.plan_tier)}`}>
                           {widget.plan_tier}
                         </span>
                         <StatusBadge status={widget.status} />
-                        {widget.auto_deliver && (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Auto</span>
-                        )}
                       </div>
                       <p className="text-sm text-[#64748b]">
                         {widget.contact_name} • {widget.contact_email} • {widget.domain}
                       </p>
                       <p className="text-xs text-[#94a3b8] mt-1">
-                        Widget ID: {widget.widget_id ? widget.widget_id.substring(0, 16) : 'N/A'}...
+                        ID: {widget.widget_id ? widget.widget_id.substring(0, 12) : 'N/A'}...
                       </p>
                       
                       {showEmbed[widget.id] && (
-                        <pre className="mt-3 p-3 bg-[#0f172a] text-[#4ade80] rounded-lg text-xs overflow-x-auto border border-[#334155]">
-                          {widget.embed_code || 'No embed code generated yet'}
-                        </pre>
+                        <div className="mt-3">
+                          {widget.embed_code ? (
+                            <pre className="p-3 bg-[#0f172a] text-[#4ade80] rounded-lg text-xs overflow-x-auto border border-[#334155]">
+                              {widget.embed_code}
+                            </pre>
+                          ) : (
+                            <div className="p-3 bg-[#0f172a] text-[#64748b] rounded-lg text-sm border border-[#334155]">
+                              No embed code yet. Click "Deliver" to generate.
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                     
                     <div className="flex items-center gap-2 flex-wrap">
                       {widget.status !== 'delivered' && (
                         <Button size="sm" onClick={() => deliverWidget(widget)}>
-                          <Send className="h-4 w-4 mr-1" />
-                          Deliver
+                          <Send className="h-4 w-4 mr-1" /> Deliver
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant={widget.auto_deliver ? "default" : "outline"}
-                        onClick={() => toggleAutoDeliver(widget)}
-                      >
-                        {widget.auto_deliver ? 'Auto: ON' : 'Auto: OFF'}
-                      </Button>
                       <Button size="sm" variant="outline" onClick={() => startEdit(widget)}>
-                        <Edit2 className="h-4 w-4 mr-1" />
-                        Edit
+                        <Edit2 className="h-4 w-4 mr-1" /> Edit
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => deleteWidget(widget)}>
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
+                        <Trash2 className="h-4 w-4 mr-1" /> Delete
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => moveToClients(widget)}>
-                        <Move className="h-4 w-4 mr-1" />
-                        To Clients
+                        <Move className="h-4 w-4 mr-1" /> To Clients
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => toggleEmbed(widget.id)}>
                         <Code className="h-4 w-4 mr-1" />
