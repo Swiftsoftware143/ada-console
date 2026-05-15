@@ -128,17 +128,51 @@ export default function PersonalWebsiteDetail() {
   const handleSave = useCallback(async () => {
     if (!website) return;
     setSaving(true);
-    const { id: _id, created_at, updated_at, ...rest } = website;
-    const { error } = await supabase
-      .from("personal_websites")
-      .update({ ...rest, domain: cleanDomain(rest.domain) })
-      .eq("id", id);
-    setSaving(false);
-    if (error) {
-      toast.error(error.message || "Failed to save");
-      return;
+    try {
+      console.log("Saving website:", id, "Current tags:", website.tags);
+      
+      // Build update payload - match database schema exactly
+      const updateData = {};
+      
+      // Only include fields that are actually set
+      if (website.name) updateData.name = website.name;
+      if (website.domain) updateData.domain = cleanDomain(website.domain);
+      if (website.plan_tier) updateData.plan_tier = website.plan_tier;
+      
+      // Handle tags - database expects array
+      if (website.tags) {
+        updateData.tags = Array.isArray(website.tags) ? website.tags : [website.tags];
+      } else {
+        updateData.tags = null;
+      }
+      
+      // Optional fields
+      if (website.location !== undefined) updateData.location = website.location || null;
+      if (website.notes !== undefined) updateData.notes = website.notes || null;
+      if (website.active !== undefined) updateData.active = Boolean(website.active);
+      
+      console.log("Update payload:", updateData);
+      
+      const { data, error } = await supabase
+        .from("personal_websites")
+        .update(updateData)
+        .eq("id", id)
+        .select();
+      
+      if (error) {
+        console.error("Supabase error:", error);
+        toast.error(error.message || "Failed to save");
+        setSaving(false);
+        return;
+      }
+      
+      console.log("Save successful:", data);
+      toast.success("Saved successfully");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Save failed: " + err.message);
     }
-    toast.success("Saved successfully");
+    setSaving(false);
   }, [website, id]);
 
   const handleDelete = useCallback(async () => {
@@ -187,10 +221,10 @@ export default function PersonalWebsiteDetail() {
   // Helper to get current tags array
   const getCurrentTags = () => {
     if (!website.tags) return [];
+    if (Array.isArray(website.tags)) return website.tags;
     if (typeof website.tags === 'string') {
       return website.tags.split(',').map(t => t.trim()).filter(Boolean);
     }
-    if (Array.isArray(website.tags)) return website.tags;
     return [];
   };
 
@@ -198,14 +232,16 @@ export default function PersonalWebsiteDetail() {
   const addTag = async (tag) => {
     const current = getCurrentTags();
     if (!current.includes(tag)) {
-      update({ tags: [...current, tag].join(', ') });
+      // Store as array for database
+      const newTagsArray = [...current, tag];
+      update({ tags: newTagsArray });
       
       // If this is a new tag not in Tag Manager, add it
       if (!availableTags.includes(tag)) {
         const newTags = [...availableTags, tag].sort();
         setAvailableTags(newTags);
         
-        // Save to Tag Manager (settings)
+        // Save to Tag Manager (settings) - store as comma-separated string
         try {
           await supabase
             .from("settings")
@@ -225,8 +261,8 @@ export default function PersonalWebsiteDetail() {
   // Helper to remove a tag
   const removeTag = (idx) => {
     const current = getCurrentTags();
-    const newTags = current.filter((_, i) => i !== idx);
-    update({ tags: newTags.join(', ') });
+    const newTagsArray = current.filter((_, i) => i !== idx);
+    update({ tags: newTagsArray });
   };
 
   return (
