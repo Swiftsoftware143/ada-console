@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import StatCard from "@/components/StatCard";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -86,10 +85,20 @@ export default function WidgetRequests() {
     }
 
     try {
+      // Create clean data object for JSON serialization
+      const submitData = {
+        business_name: String(formData.business_name || ''),
+        contact_name: String(formData.contact_name || ''),
+        contact_email: String(formData.contact_email || ''),
+        domain: String(formData.domain || ''),
+        plan_tier: String(formData.plan_tier || 'basic'),
+        auto_deliver: Boolean(formData.auto_deliver)
+      };
+      
       const response = await fetch(`${WEBHOOK_SERVER}/webhook/ada-widget-crm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(submitData)
       });
 
       const result = await response.json();
@@ -267,12 +276,14 @@ export default function WidgetRequests() {
               </Select>
             </div>
             <div className="flex items-center space-x-2 pt-8">
-              <Checkbox
+              <input
+                type="checkbox"
+                id="auto_deliver"
                 checked={formData.auto_deliver}
-                onCheckedChange={(checked) => setFormData({...formData, auto_deliver: checked})}
-                className="border-[#334155] data-[state=checked]:bg-[#4ade80] data-[state=checked]:border-[#4ade80]"
+                onChange={(e) => setFormData({...formData, auto_deliver: e.target.checked})}
+                className="w-5 h-5 rounded border-[#334155] bg-[#0f172a] text-[#4ade80] focus:ring-[#4ade80]"
               />
-              <Label className="cursor-pointer text-[#e2e8f0]">Auto-deliver widget</Label>
+              <Label htmlFor="auto_deliver" className="cursor-pointer text-[#e2e8f0]">Auto-deliver widget</Label>
             </div>
           </div>
           <Button type="submit" disabled={formLoading} className="w-full sm:w-auto">
