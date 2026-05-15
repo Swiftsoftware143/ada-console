@@ -149,20 +149,31 @@ export default function ClientDetail({ isPersonal = false }) {
       
       console.log("Update payload:", updateData);
       
-      const { data, error } = await supabase
-        .from(isPersonal ? "personal_websites" : "clients")
-        .update(updateData)
-        .eq("id", id)
-        .select();
+      // Use raw fetch to avoid Supabase client issues
+      const tableName = isPersonal ? "personal_websites" : "clients";
+      const url = `${process.env.REACT_APP_SUPABASE_URL}/rest/v1/${tableName}?id=eq.${id}`;
       
-      if (error) {
-        console.error("Supabase error:", error);
-        toast.error(error.message || "Failed to save");
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(updateData)
+      });
+      
+      console.log("Response status:", response.status);
+      
+      if (!response.ok) {
+        console.error("Save failed with status:", response.status);
+        toast.error(`Save failed: ${response.status}`);
         setSaving(false);
         return;
       }
       
-      console.log("Save successful:", data);
+      console.log("Save successful");
       toast.success("Saved successfully");
     } catch (err) {
       console.error("Save error:", err);
