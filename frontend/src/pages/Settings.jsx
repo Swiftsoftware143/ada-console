@@ -120,85 +120,86 @@ export default function Settings() {
   );
 }
 
-// Category Manager Component
-function CategoryManagerCard() {
-  const [categories, setCategories] = useState([]);
-  const [newCategory, setNewCategory] = useState("");
+// Tag Manager Component
+function TagManagerCard() {
+  const [tags, setTags] = useState([]);
+  const [newTag, setNewTag] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadCategories();
+    loadTags();
   }, []);
 
-  const loadCategories = async () => {
+  const loadTags = async () => {
     setLoading(true);
     try {
+      // Load from settings
       const { data, error } = await supabase
         .from("settings")
         .select("value")
-        .eq("key", "categories")
+        .eq("key", "tags")
         .maybeSingle();
       
       if (error) throw error;
       
       if (data?.value) {
-        // Parse stored categories (comma-separated or JSON array)
         const parsed = typeof data.value === 'string' 
-          ? data.value.split(',').map(c => c.trim()).filter(Boolean)
+          ? data.value.split(',').map(t => t.trim()).filter(Boolean)
           : Array.isArray(data.value) ? data.value : [];
-        setCategories(parsed);
+        setTags(parsed);
       } else {
-        // Default categories
-        setCategories(["Medical", "Local Business", "E-commerce", "Professional Services", "Non-Profit"]);
+        // Default tags
+        setTags(["Medical", "Local Business", "E-commerce", "Professional Services", "Non-Profit", "Enterprise", "Basic Plan", "Pro Plan"]);
       }
     } catch (e) {
-      console.error("Error loading categories:", e);
-      toast.error("Failed to load categories");
+      console.error("Error loading tags:", e);
+      toast.error("Failed to load tags");
     }
     setLoading(false);
   };
 
-  const saveCategories = async (newCategories) => {
+  const saveTags = async (newTags) => {
     setSaving(true);
     try {
       const { error } = await supabase
         .from("settings")
         .upsert({ 
-          key: "categories", 
-          value: newCategories.join(", "),
+          key: "tags", 
+          value: newTags.join(", "),
           updated_at: new Date().toISOString() 
         });
       
       if (error) throw error;
-      setCategories(newCategories);
-      toast.success("Categories saved");
+      setTags(newTags);
+      toast.success("Tags saved");
     } catch (e) {
-      console.error("Error saving categories:", e);
-      toast.error("Failed to save categories");
+      console.error("Error saving tags:", e);
+      toast.error("Failed to save tags");
     }
     setSaving(false);
   };
 
-  const addCategory = () => {
-    if (!newCategory.trim()) return;
-    if (categories.includes(newCategory.trim())) {
-      toast.error("Category already exists");
+  const addTag = () => {
+    if (!newTag.trim()) return;
+    const normalizedTag = newTag.trim();
+    if (tags.includes(normalizedTag)) {
+      toast.error("Tag already exists");
       return;
     }
-    const updated = [...categories, newCategory.trim()];
-    saveCategories(updated);
-    setNewCategory("");
+    const updated = [...tags, normalizedTag];
+    saveTags(updated);
+    setNewTag("");
   };
 
-  const deleteCategory = (catToDelete) => {
-    const updated = categories.filter(c => c !== catToDelete);
-    saveCategories(updated);
+  const deleteTag = (tagToDelete) => {
+    const updated = tags.filter(t => t !== tagToDelete);
+    saveTags(updated);
   };
 
   if (loading) return (
     <Card className="mt-6 bg-[#1e2130] border-[#2e3245]">
-      <CardContent className="p-6 text-[#64748b]">Loading categories...</CardContent>
+      <CardContent className="p-6 text-[#64748b]">Loading tags...</CardContent>
     </Card>
   );
 
@@ -207,24 +208,24 @@ function CategoryManagerCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-white">
           <Tag className="h-5 w-5 text-[#007bff]" />
-          Category Manager
+          Tag Manager
         </CardTitle>
         <CardDescription className="text-[#94a3b8]">
-          Manage categories for Clients and Personal Websites
+          Manage tags for filtering Clients and Personal Websites. Clients can have multiple tags.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex flex-wrap gap-2">
-          {categories.map((cat) => (
+          {tags.map((tag) => (
             <span 
-              key={cat} 
+              key={tag} 
               className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#007bff]/20 text-[#007bff] rounded-full text-sm"
             >
-              {cat}
+              {tag}
               <button
-                onClick={() => deleteCategory(cat)}
+                onClick={() => deleteTag(tag)}
                 className="hover:text-white ml-1"
-                title="Delete category"
+                title="Delete tag"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -234,20 +235,20 @@ function CategoryManagerCard() {
         
         <div className="flex gap-2">
           <Input
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value)}
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                addCategory();
+                addTag();
               }
             }}
-            placeholder="New category name..."
+            placeholder="New tag name..."
             className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b]"
           />
           <Button 
-            onClick={addCategory} 
-            disabled={saving || !newCategory.trim()}
+            onClick={addTag} 
+            disabled={saving || !newTag.trim()}
             className="bg-[#007bff]"
           >
             <Plus className="h-4 w-4 mr-1" /> Add
@@ -255,7 +256,7 @@ function CategoryManagerCard() {
         </div>
         
         <p className="text-xs text-[#64748b]">
-          These categories will appear in dropdowns when adding/editing Clients and Personal Websites.
+          Tags work like labels — assign multiple tags to each client for flexible filtering. Delete unused tags anytime.
         </p>
       </CardContent>
     </Card>

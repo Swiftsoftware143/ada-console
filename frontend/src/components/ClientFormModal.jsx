@@ -27,38 +27,39 @@ const initialState = {
   name: "",
   domain: "",
   plan_tier: "basic",
-  categories: [],
+  tags: [],
   location: "",
   notes: "",
 };
 
 export default function ClientFormModal({ open, onOpenChange, onCreated, isPersonal = false }) {
   const [form, setForm] = useState(initialState);
-  const [managedCategories, setManagedCategories] = useState([]);
+  const [availableTags, setAvailableTags] = useState([]);
+  const [tagInput, setTagInput] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setForm(initialState);
-      loadCategories();
+      loadTags();
     }
   }, [open]);
 
-  const loadCategories = async () => {
-    // Load managed categories from settings
+  const loadTags = async () => {
+    // Load tags from settings
     const { data: settingsData } = await supabase
       .from("settings")
       .select("value")
-      .eq("key", "categories")
+      .eq("key", "tags")
       .maybeSingle();
     
     if (settingsData?.value) {
       const parsed = typeof settingsData.value === 'string'
-        ? settingsData.value.split(',').map(c => c.trim()).filter(Boolean)
+        ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
         : Array.isArray(settingsData.value) ? settingsData.value : [];
-      setManagedCategories(parsed);
+      setAvailableTags(parsed);
     } else {
-      setManagedCategories(["Medical", "Local Business", "E-commerce", "Professional Services", "Non-Profit"]);
+      setAvailableTags(["Medical", "Local Business", "E-commerce", "Professional Services", "Non-Profit", "Enterprise", "Basic Plan", "Pro Plan"]);
     }
   };
 
@@ -74,16 +75,16 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
     }
 
     setSaving(true);
-    // Store categories as comma-separated string in category field
-    const categoryString = form.categories.length > 0 
-      ? form.categories.join(', ')
+    // Store tags as comma-separated string in tags field
+    const tagsString = form.tags.length > 0 
+      ? form.tags.join(', ')
       : null;
     
     const payload = {
       name: form.name.trim(),
       domain: cleanDomain(form.domain),
       plan_tier: form.plan_tier,
-      category: categoryString,
+      tags: tagsString,
       location: form.location.trim() || null,
       notes: form.notes.trim() || null,
       active: false,
@@ -168,21 +169,21 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
             </p>
           </div>
 
-          {/* Categories Section */}
+          {/* Tags Section */}
           <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
-              Categories
+              Tags
             </Label>
             <div className="flex flex-wrap gap-2 mb-2">
-              {form.categories.map((cat, idx) => (
+              {form.tags.map((tag, idx) => (
                 <span 
                   key={idx} 
                   className="inline-flex items-center gap-1 px-2 py-1 bg-[#007bff]/20 text-[#007bff] rounded text-xs"
                 >
-                  {cat}
+                  {tag}
                   <button
                     type="button"
-                    onClick={() => setForm({ ...form, categories: form.categories.filter((_, i) => i !== idx) })}
+                    onClick={() => setForm({ ...form, tags: form.tags.filter((_, i) => i !== idx) })}
                     className="hover:text-white"
                   >
                     ×
@@ -190,27 +191,54 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
                 </span>
               ))}
             </div>
-            <Select
-              value=""
-              onValueChange={(value) => {
-                if (value && !form.categories.includes(value)) {
-                  setForm({ ...form, categories: [...form.categories, value] });
-                }
-              }}
-            >
-              <SelectTrigger className="bg-[#0f1117] border-[#2e3245] text-white">
-                <SelectValue placeholder="Select a category..." />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1e2130] border-[#2e3245] text-white max-h-60">
-                {managedCategories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            
+            {/* Quick-add from existing tags */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              {availableTags.filter(t => !form.tags.includes(t)).slice(0, 8).map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setForm({ ...form, tags: [...form.tags, tag] })}
+                  className="px-2 py-1 bg-[#2e3245] text-[#94a3b8] rounded text-xs hover:bg-[#007bff]/20 hover:text-[#007bff]"
+                >
+                  + {tag}
+                </button>
+              ))}
+            </div>
+            
+            {/* Add custom tag */}
+            <div className="flex gap-2">
+              <Input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
+                      setForm({ ...form, tags: [...form.tags, tagInput.trim()] });
+                      setTagInput("");
+                    }
+                  }
+                }}
+                placeholder="Add custom tag..."
+                className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b]"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
+                    setForm({ ...form, tags: [...form.tags, tagInput.trim()] });
+                    setTagInput("");
+                  }
+                }}
+                className="bg-transparent border-[#2e3245] text-white hover:bg-[#1a1d27]"
+              >
+                Add
+              </Button>
+            </div>
             <p className="text-xs text-[#64748b]">
-              Select multiple categories. Manage categories in Settings → Category Manager.
+              Click quick tags above or type custom. Manage all tags in Settings → Tag Manager.
             </p>
           </div>
 

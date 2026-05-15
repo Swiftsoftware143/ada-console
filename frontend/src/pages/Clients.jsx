@@ -48,10 +48,10 @@ export default function Clients() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [tagFilter, setTagFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [categories, setCategories] = useState([]);
+  const [availableTags, setAvailableTags] = useState([]);
   const [locations, setLocations] = useState([]);
   const [sortKey, setSortKey] = useState("created_at");
   const [sortDir, setSortDir] = useState("desc");
@@ -62,18 +62,25 @@ export default function Clients() {
 
   const loadFilters = useCallback(async () => {
     const [{ data: clientsData }, { data: websitesData }] = await Promise.all([
-      supabase.from("clients").select("category,location"),
-      supabase.from("personal_websites").select("category,location"),
+      supabase.from("clients").select("tags,location"),
+      supabase.from("personal_websites").select("tags,location"),
     ]);
     
-    const allCats = new Set();
+    const allTags = new Set();
     const allLocs = new Set();
     [...(clientsData || []), ...(websitesData || [])].forEach(item => {
-      if (item.category) allCats.add(item.category);
+      // Parse tags (comma-separated or array)
+      if (item.tags) {
+        if (typeof item.tags === 'string') {
+          item.tags.split(',').forEach(t => allTags.add(t.trim()));
+        } else if (Array.isArray(item.tags)) {
+          item.tags.forEach(t => allTags.add(t));
+        }
+      }
       if (item.location) allLocs.add(item.location);
     });
     
-    setCategories(Array.from(allCats).sort());
+    setAvailableTags(Array.from(allTags).sort());
     setLocations(Array.from(allLocs).sort());
   }, []);
 
@@ -145,18 +152,20 @@ export default function Clients() {
         c.name?.toLowerCase().includes(search.toLowerCase()) ||
         c.domain?.toLowerCase().includes(search.toLowerCase()) ||
         c.plan_tier?.toLowerCase().includes(search.toLowerCase()) ||
-        c.category?.toLowerCase().includes(search.toLowerCase()) ||
+        c.tags?.toLowerCase().includes(search.toLowerCase()) ||
         c.location?.toLowerCase().includes(search.toLowerCase());
       
-      const matchesCategory = categoryFilter === "all" || c.category === categoryFilter;
+      // Check if client has the selected tag
+      const clientTags = c.tags ? (typeof c.tags === 'string' ? c.tags.split(',').map(t => t.trim()) : c.tags) : [];
+      const matchesTag = tagFilter === "all" || clientTags.includes(tagFilter);
       const matchesLocation = locationFilter === "all" || c.location === locationFilter;
       const matchesStatus = statusFilter === "all" || 
         (statusFilter === "active" && c.active) || 
         (statusFilter === "inactive" && !c.active);
       
-      return matchesSearch && matchesCategory && matchesLocation && matchesStatus;
+      return matchesSearch && matchesTag && matchesLocation && matchesStatus;
     });
-  }, [clients, search, categoryFilter, locationFilter, statusFilter]);
+  }, [clients, search, tagFilter, locationFilter, statusFilter]);
 
   const filteredSorted = useMemo(
     () => sortByKey(filteredClients, sortKey, sortDir),
@@ -164,13 +173,13 @@ export default function Clients() {
   );
 
   const clearFilters = () => {
-    setCategoryFilter("all");
+    setTagFilter("all");
     setLocationFilter("all");
     setStatusFilter("all");
     setSearch("");
   };
 
-  const hasFilters = categoryFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || search !== "";
+  const hasFilters = tagFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || search !== "";
 
   const renderTable = () => {
     if (loading) {
@@ -225,11 +234,18 @@ export default function Clients() {
                 <td className="px-6 py-4 text-white font-medium">{c.name}</td>
                 <td className="px-6 py-4 text-[#94a3b8] font-mono text-xs">{c.domain}</td>
                 <td className="px-6 py-4">
-                  {c.category ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#007bff]/10 text-[#007bff] text-xs">
-                      <Tag className="h-3 w-3" />
-                      {c.category}
-                    </span>
+                  {c.tags ? (
+                    <div className="flex flex-wrap gap-1">
+                      {(typeof c.tags === 'string' ? c.tags.split(',').map(t => t.trim()) : c.tags).slice(0, 3).map((tag, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#007bff]/10 text-[#007bff] text-xs">
+                          <Tag className="h-3 w-3" />
+                          {tag}
+                        </span>
+                      ))}
+                      {(typeof c.tags === 'string' ? c.tags.split(',').map(t => t.trim()) : c.tags).length > 3 && (
+                        <span className="text-[#64748b] text-xs">+{(typeof c.tags === 'string' ? c.tags.split(',').map(t => t.trim()) : c.tags).length - 3} more</span>
+                      )}
+                    </div>
                   ) : (
                     <span className="text-[#64748b] text-xs">-</span>
                   )}
@@ -312,7 +328,7 @@ export default function Clients() {
               className="border-[#2e3245] text-[#94a3b8] hover:text-white hover:border-[#3e445e]"
             >
               <Tag className="h-4 w-4 mr-2" />
-              Categories
+              Tags
             </Button>
             <Button
               data-testid="add-new-client-btn"
@@ -340,15 +356,15 @@ export default function Clients() {
               />
             </div>
             
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select value={tagFilter} onValueChange={setTagFilter}>
               <SelectTrigger className="w-[160px] bg-[#0f1117] border-[#2e3245] text-white">
                 <Tag className="h-4 w-4 mr-2 text-[#64748b]" />
-                <SelectValue placeholder="Category" />
+                <SelectValue placeholder="Tag" />
               </SelectTrigger>
               <SelectContent className="bg-[#1e2130] border-[#2e3245]">
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                <SelectItem value="all">All Tags</SelectItem>
+                {availableTags.map((tag) => (
+                  <SelectItem key={tag} value={tag}>{tag}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
