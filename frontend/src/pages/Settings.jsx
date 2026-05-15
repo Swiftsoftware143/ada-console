@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Save, Globe, Building2, Check } from "lucide-react";
+import { Save, Globe, Building2, Check, Tag, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -114,6 +114,150 @@ export default function Settings() {
           <Button onClick={handleSaveAgencyDefaults} disabled={saving} className="bg-[#007bff]">{saving ? "Saving..." : <><Save className="h-4 w-4 mr-2" /> Save Agency Defaults</>}</Button>
         </CardContent>
       </Card>
+      
+      <CategoryManagerCard />
     </div>
+  );
+}
+
+// Category Manager Component
+function CategoryManagerCard() {
+  const [categories, setCategories] = useState([]);
+  const [newCategory, setNewCategory] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "categories")
+        .maybeSingle();
+      
+      if (error) throw error;
+      
+      if (data?.value) {
+        // Parse stored categories (comma-separated or JSON array)
+        const parsed = typeof data.value === 'string' 
+          ? data.value.split(',').map(c => c.trim()).filter(Boolean)
+          : Array.isArray(data.value) ? data.value : [];
+        setCategories(parsed);
+      } else {
+        // Default categories
+        setCategories(["Medical", "Local Business", "E-commerce", "Professional Services", "Non-Profit"]);
+      }
+    } catch (e) {
+      console.error("Error loading categories:", e);
+      toast.error("Failed to load categories");
+    }
+    setLoading(false);
+  };
+
+  const saveCategories = async (newCategories) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("settings")
+        .upsert({ 
+          key: "categories", 
+          value: newCategories.join(", "),
+          updated_at: new Date().toISOString() 
+        });
+      
+      if (error) throw error;
+      setCategories(newCategories);
+      toast.success("Categories saved");
+    } catch (e) {
+      console.error("Error saving categories:", e);
+      toast.error("Failed to save categories");
+    }
+    setSaving(false);
+  };
+
+  const addCategory = () => {
+    if (!newCategory.trim()) return;
+    if (categories.includes(newCategory.trim())) {
+      toast.error("Category already exists");
+      return;
+    }
+    const updated = [...categories, newCategory.trim()];
+    saveCategories(updated);
+    setNewCategory("");
+  };
+
+  const deleteCategory = (catToDelete) => {
+    const updated = categories.filter(c => c !== catToDelete);
+    saveCategories(updated);
+  };
+
+  if (loading) return (
+    <Card className="mt-6 bg-[#1e2130] border-[#2e3245]">
+      <CardContent className="p-6 text-[#64748b]">Loading categories...</CardContent>
+    </Card>
+  );
+
+  return (
+    <Card className="mt-6 bg-[#1e2130] border-[#2e3245]">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-white">
+          <Tag className="h-5 w-5 text-[#007bff]" />
+          Category Manager
+        </CardTitle>
+        <CardDescription className="text-[#94a3b8]">
+          Manage categories for Clients and Personal Websites
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex flex-wrap gap-2">
+          {categories.map((cat) => (
+            <span 
+              key={cat} 
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#007bff]/20 text-[#007bff] rounded-full text-sm"
+            >
+              {cat}
+              <button
+                onClick={() => deleteCategory(cat)}
+                className="hover:text-white ml-1"
+                title="Delete category"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+        
+        <div className="flex gap-2">
+          <Input
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addCategory();
+              }
+            }}
+            placeholder="New category name..."
+            className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b]"
+          />
+          <Button 
+            onClick={addCategory} 
+            disabled={saving || !newCategory.trim()}
+            className="bg-[#007bff]"
+          >
+            <Plus className="h-4 w-4 mr-1" /> Add
+          </Button>
+        </div>
+        
+        <p className="text-xs text-[#64748b]">
+          These categories will appear in dropdowns when adding/editing Clients and Personal Websites.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
