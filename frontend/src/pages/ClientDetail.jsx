@@ -139,8 +139,12 @@ export default function ClientDetail({ isPersonal = false }) {
       if (client.domain) updateData.domain = cleanDomain(client.domain);
       if (client.plan_tier) updateData.plan_tier = client.plan_tier;
       
-      // Handle tags - can be string or null
-      updateData.tags = client.tags || null;
+      // Handle tags - database expects array
+      if (client.tags) {
+        updateData.tags = Array.isArray(client.tags) ? client.tags : [client.tags];
+      } else {
+        updateData.tags = null;
+      }
       
       // Optional fields
       if (client.location !== undefined) updateData.location = client.location || null;
@@ -241,10 +245,10 @@ export default function ClientDetail({ isPersonal = false }) {
   // Helper to get current tags array
   const getCurrentTags = () => {
     if (!client.tags) return [];
+    if (Array.isArray(client.tags)) return client.tags;
     if (typeof client.tags === 'string') {
       return client.tags.split(',').map(t => t.trim()).filter(Boolean);
     }
-    if (Array.isArray(client.tags)) return client.tags;
     return [];
   };
 
@@ -252,14 +256,16 @@ export default function ClientDetail({ isPersonal = false }) {
   const addTag = async (tag) => {
     const current = getCurrentTags();
     if (!current.includes(tag)) {
-      update({ tags: [...current, tag].join(', ') });
+      // Store as array for database
+      const newTagsArray = [...current, tag];
+      update({ tags: newTagsArray });
       
       // If this is a new tag not in Tag Manager, add it
       if (!availableTags.includes(tag)) {
         const newTags = [...availableTags, tag].sort();
         setAvailableTags(newTags);
         
-        // Save to Tag Manager (settings)
+        // Save to Tag Manager (settings) - store as comma-separated string
         try {
           await supabase
             .from("settings")
@@ -279,8 +285,8 @@ export default function ClientDetail({ isPersonal = false }) {
   // Helper to remove a tag
   const removeTag = (idx) => {
     const current = getCurrentTags();
-    const newTags = current.filter((_, i) => i !== idx);
-    update({ tags: newTags.join(', ') });
+    const newTagsArray = current.filter((_, i) => i !== idx);
+    update({ tags: newTagsArray });
   };
 
   return (
