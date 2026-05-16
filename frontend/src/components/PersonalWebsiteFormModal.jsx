@@ -76,8 +76,10 @@ export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated
 
     setSaving(true);
     
-    // Find tags that are new (not in availableTags)
-    const newTags = form.tags.filter(tag => !availableTags.includes(tag));
+    // Find tags that are new (not in availableTags) - case-insensitive
+    const newTags = form.tags.filter(tag => 
+      !availableTags.some(t => t.toLowerCase() === tag.toLowerCase())
+    );
     
     // Add new tags to settings
     if (newTags.length > 0) {
@@ -95,7 +97,10 @@ export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated
             : Array.isArray(settingsData.value) ? settingsData.value : [];
         }
         
-        const tagsToAdd = newTags.filter(tag => !currentTags.includes(tag));
+        // Case-insensitive check against settings tags
+        const tagsToAdd = newTags.filter(tag => 
+          !currentTags.some(t => t.toLowerCase() === tag.toLowerCase())
+        );
         if (tagsToAdd.length > 0) {
           const updatedTags = [...currentTags, ...tagsToAdd];
           await supabase
@@ -216,9 +221,9 @@ export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated
               ))}
             </div>
             
-            {/* Quick-add from existing tags */}
+            {/* Quick-add from existing tags - case-insensitive filter */}
             <div className="flex flex-wrap gap-1 mb-2">
-              {availableTags.filter(t => !form.tags.includes(t)).slice(0, 8).map((tag) => (
+              {availableTags.filter(t => !form.tags.some(ft => ft.toLowerCase() === t.toLowerCase())).slice(0, 8).map((tag) => (
                 <button
                   key={tag}
                   type="button"
@@ -238,9 +243,14 @@ export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
-                      setForm({ ...form, tags: [...form.tags, tagInput.trim()] });
+                    const trimmedTag = tagInput.trim();
+                    // Case-insensitive duplicate check
+                    const tagExists = form.tags.some(t => t.toLowerCase() === trimmedTag.toLowerCase());
+                    if (trimmedTag && !tagExists) {
+                      setForm({ ...form, tags: [...form.tags, trimmedTag] });
                       setTagInput("");
+                    } else if (tagExists) {
+                      toast.error("Tag already added");
                     }
                   }
                 }}
@@ -251,9 +261,14 @@ export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
-                    setForm({ ...form, tags: [...form.tags, tagInput.trim()] });
+                  const trimmedTag = tagInput.trim();
+                  // Case-insensitive duplicate check
+                  const tagExists = form.tags.some(t => t.toLowerCase() === trimmedTag.toLowerCase());
+                  if (trimmedTag && !tagExists) {
+                    setForm({ ...form, tags: [...form.tags, trimmedTag] });
                     setTagInput("");
+                  } else if (tagExists) {
+                    toast.error("Tag already added");
                   }
                 }}
                 className="bg-transparent border-[#2e3245] text-white hover:bg-[#1a1d27]"

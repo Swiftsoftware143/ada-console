@@ -144,8 +144,10 @@ export default function ClientDetail({ isPersonal = false }) {
       // Get current tags array
       const currentTags = getCurrentTags();
       
-      // Find any new tags that aren't in the Tag Manager yet
-      const newTags = currentTags.filter(tag => !availableTags.includes(tag));
+      // Find any new tags that aren't in the Tag Manager yet (case-insensitive)
+      const newTags = currentTags.filter(tag => 
+        !availableTags.some(t => t.toLowerCase() === tag.toLowerCase())
+      );
       
       // Sync new tags to Tag Manager
       if (newTags.length > 0) {
@@ -164,7 +166,11 @@ export default function ClientDetail({ isPersonal = false }) {
               : Array.isArray(settingsData.value) ? settingsData.value : [];
           }
           
-          const tagsToAdd = newTags.filter(tag => !currentSettingsTags.includes(tag));
+          // Case-insensitive check against settings tags
+          const tagsToAdd = newTags.filter(tag => 
+            !currentSettingsTags.some(t => t.toLowerCase() === tag.toLowerCase())
+          );
+          
           if (tagsToAdd.length > 0) {
             const updatedTags = [...currentSettingsTags, ...tagsToAdd];
             await supabase
@@ -299,29 +305,37 @@ export default function ClientDetail({ isPersonal = false }) {
   // Helper to add a tag
   const addTag = async (tag) => {
     const current = getCurrentTags();
-    if (!current.includes(tag)) {
-      // Store as array for database
-      const newTagsArray = [...current, tag];
-      update({ tags: newTagsArray });
+    // Case-insensitive check for duplicates
+    const tagLower = tag.toLowerCase();
+    const tagExists = current.some(t => t.toLowerCase() === tagLower);
+    
+    if (tagExists) {
+      toast.error(`Tag "${tag}" is already assigned`);
+      return;
+    }
+    
+    // Store as array for database
+    const newTagsArray = [...current, tag];
+    update({ tags: newTagsArray });
+    
+    // If this is a new tag not in Tag Manager, add it
+    const tagNotInManager = !availableTags.some(t => t.toLowerCase() === tagLower);
+    if (tagNotInManager) {
+      const newTags = [...availableTags, tag].sort();
+      setAvailableTags(newTags);
       
-      // If this is a new tag not in Tag Manager, add it
-      if (!availableTags.includes(tag)) {
-        const newTags = [...availableTags, tag].sort();
-        setAvailableTags(newTags);
-        
-        // Save to Tag Manager (settings) - store as comma-separated string
-        try {
-          await supabase
-            .from("settings")
-            .upsert({ 
-              key: "tags", 
-              value: newTags.join(", "),
-              updated_at: new Date().toISOString() 
-            });
-          console.log("Added new tag to Tag Manager:", tag);
-        } catch (e) {
-          console.error("Failed to save tag to Tag Manager:", e);
-        }
+      // Save to Tag Manager (settings) - store as comma-separated string
+      try {
+        await supabase
+          .from("settings")
+          .upsert({ 
+            key: "tags", 
+            value: newTags.join(", "),
+            updated_at: new Date().toISOString() 
+          });
+        console.log("Added new tag to Tag Manager:", tag);
+      } catch (e) {
+        console.error("Failed to save tag to Tag Manager:", e);
       }
     }
   };
@@ -429,11 +443,14 @@ export default function ClientDetail({ isPersonal = false }) {
                 </SelectTrigger>
                 <SelectContent className="bg-[#1e2130] border-[#2e3245] max-h-[300px]">
                   <SelectItem value="__placeholder__" disabled>Select a tag...</SelectItem>
-                  {availableTags.map((tag) => (
-                    <SelectItem key={tag} value={tag}>
-                      {getCurrentTags().includes(tag) ? `✓ ${tag} (already assigned)` : tag}
-                    </SelectItem>
-                  ))}
+                  {availableTags.map((tag) => {
+                    const isAssigned = getCurrentTags().some(t => t.toLowerCase() === tag.toLowerCase());
+                    return (
+                      <SelectItem key={tag} value={tag}>
+                        {isAssigned ? `✓ ${tag} (already assigned)` : tag}
+                      </SelectItem>
+                    );
+                  })}
                   {availableTags.length === 0 && (
                     <SelectItem value="__empty__" disabled>No tags in Tag Manager</SelectItem>
                   )}

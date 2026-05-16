@@ -184,7 +184,9 @@ function TagManagerCard() {
   const addTag = () => {
     if (!newTag.trim()) return;
     const normalizedTag = newTag.trim();
-    if (tags.includes(normalizedTag)) {
+    // Case-insensitive duplicate check
+    const tagExists = tags.some(t => t.toLowerCase() === normalizedTag.toLowerCase());
+    if (tagExists) {
       toast.error("Tag already exists");
       return;
     }
