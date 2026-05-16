@@ -63,6 +63,43 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
     }
   };
 
+  // Helper to add new tags to the global settings
+  const addTagsToSettings = async (newTags) => {
+    if (newTags.length === 0) return;
+    
+    try {
+      // Get current tags from settings
+      const { data: settingsData } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "tags")
+        .maybeSingle();
+      
+      let currentTags = [];
+      if (settingsData?.value) {
+        currentTags = typeof settingsData.value === 'string'
+          ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
+          : Array.isArray(settingsData.value) ? settingsData.value : [];
+      }
+      
+      // Add new tags that don't already exist
+      const tagsToAdd = newTags.filter(tag => !currentTags.includes(tag));
+      if (tagsToAdd.length > 0) {
+        const updatedTags = [...currentTags, ...tagsToAdd];
+        await supabase
+          .from("settings")
+          .upsert({ 
+            key: "tags", 
+            value: updatedTags.join(", "),
+            updated_at: new Date().toISOString() 
+          });
+      }
+    } catch (e) {
+      console.error("Error adding tags to settings:", e);
+      // Don't fail the client creation if tag sync fails
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) {
@@ -75,6 +112,15 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
     }
 
     setSaving(true);
+    
+    // Find tags that are new (not in availableTags)
+    const newTags = form.tags.filter(tag => !availableTags.includes(tag));
+    
+    // Add new tags to settings
+    if (newTags.length > 0) {
+      await addTagsToSettings(newTags);
+    }
+    
     // Store tags as comma-separated string in tags field
     const tagsString = form.tags.length > 0 
       ? form.tags.join(', ')

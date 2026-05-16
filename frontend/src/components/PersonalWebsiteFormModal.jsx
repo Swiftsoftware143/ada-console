@@ -27,16 +27,41 @@ const initialState = {
   name: "",
   domain: "",
   plan_tier: "basic",
+  tags: [],
+  location: "",
   notes: "",
 };
 
 export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated }) {
   const [form, setForm] = useState(initialState);
+  const [availableTags, setAvailableTags] = useState([]);
+  const [tagInput, setTagInput] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) setForm(initialState);
+    if (open) {
+      setForm(initialState);
+      loadTags();
+    }
   }, [open]);
+
+  const loadTags = async () => {
+    // Load tags from settings
+    const { data: settingsData } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "tags")
+      .maybeSingle();
+    
+    if (settingsData?.value) {
+      const parsed = typeof settingsData.value === 'string'
+        ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
+        : Array.isArray(settingsData.value) ? settingsData.value : [];
+      setAvailableTags(parsed);
+    } else {
+      setAvailableTags(["Medical", "Local Business", "E-commerce", "Professional Services", "Non-Profit", "Enterprise", "Basic Plan", "Pro Plan"]);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,10 +75,53 @@ export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated
     }
 
     setSaving(true);
+    
+    // Find tags that are new (not in availableTags)
+    const newTags = form.tags.filter(tag => !availableTags.includes(tag));
+    
+    // Add new tags to settings
+    if (newTags.length > 0) {
+      try {
+        const { data: settingsData } = await supabase
+          .from("settings")
+          .select("value")
+          .eq("key", "tags")
+          .maybeSingle();
+        
+        let currentTags = [];
+        if (settingsData?.value) {
+          currentTags = typeof settingsData.value === 'string'
+            ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
+            : Array.isArray(settingsData.value) ? settingsData.value : [];
+        }
+        
+        const tagsToAdd = newTags.filter(tag => !currentTags.includes(tag));
+        if (tagsToAdd.length > 0) {
+          const updatedTags = [...currentTags, ...tagsToAdd];
+          await supabase
+            .from("settings")
+            .upsert({ 
+              key: "tags", 
+              value: updatedTags.join(", "),
+              updated_at: new Date().toISOString() 
+            });
+        }
+      } catch (e) {
+        console.error("Error adding tags to settings:", e);
+      }
+    }
+    
+    // Store tags as comma-separated string
+    const tagsString = form.tags.length > 0 
+      ? form.tags.join(', ')
+      : null;
+    
     const payload = {
       name: form.name.trim(),
       domain: cleanDomain(form.domain),
       plan_tier: form.plan_tier,
+      tags: tagsString,
+      location: form.location.trim() || null,
       notes: form.notes.trim() || null,
       active: false,
       agency_name: "SwiftImpact Solutions",
@@ -123,6 +191,91 @@ export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated
             <p className="text-xs text-[#64748b]">
               https://, www., and trailing slashes are stripped automatically.
             </p>
+          </div>
+
+          {/* Tags Section */}
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
+              Tags
+            </Label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {form.tags.map((tag, idx) => (
+                <span 
+                  key={idx} 
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-[#007bff]/20 text-[#007bff] rounded text-xs"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, tags: form.tags.filter((_, i) => i !== idx) })}
+                    className="hover:text-white"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            
+            {/* Quick-add from existing tags */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              {availableTags.filter(t => !form.tags.includes(t)).slice(0, 8).map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setForm({ ...form, tags: [...form.tags, tag] })}
+                  className="px-2 py-1 bg-[#2e3245] text-[#94a3b8] rounded text-xs hover:bg-[#007bff]/20 hover:text-[#007bff]"
+                >
+                  + {tag}
+                </button>
+              ))}
+            </div>
+            
+            {/* Add custom tag */}
+            <div className="flex gap-2">
+              <Input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
+                      setForm({ ...form, tags: [...form.tags, tagInput.trim()] });
+                      setTagInput("");
+                    }
+                  }
+                }}
+                placeholder="Add custom tag..."
+                className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b]"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
+                    setForm({ ...form, tags: [...form.tags, tagInput.trim()] });
+                    setTagInput("");
+                  }
+                }}
+                className="bg-transparent border-[#2e3245] text-white hover:bg-[#1a1d27]"
+              >
+                Add
+              </Button>
+            </div>
+            <p className="text-xs text-[#64748b]">
+              Click quick tags above or type custom. Manage all tags in Settings → Tag Manager.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
+              Location
+            </Label>
+            <Input
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              placeholder="City, State"
+              className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b]"
+            />
           </div>
 
           <div className="space-y-1.5">
