@@ -223,7 +223,7 @@ export default function PersonalWebsiteDetail() {
       toast.error("Save failed: " + err.message);
     }
     setSaving(false);
-  }, [website, id]);
+  }, [website, id, availableTags, getCurrentTags]);
 
   const handleDelete = useCallback(async () => {
     const { error } = await supabase

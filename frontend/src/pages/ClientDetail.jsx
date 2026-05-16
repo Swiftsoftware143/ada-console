@@ -257,7 +257,7 @@ export default function ClientDetail({ isPersonal = false }) {
       toast.error("Save failed: " + err.message);
     }
     setSaving(false);
-  }, [client, id, isPersonal]);
+  }, [client, id, isPersonal, availableTags, getCurrentTags]);
 
   const handleDelete = useCallback(async () => {
     const { error } = await supabase
