@@ -125,6 +125,16 @@ export default function PersonalWebsiteDetail() {
     []
   );
 
+  // Helper to get current tags array - defined before handleSave to avoid dependency issues
+  const getCurrentTags = useCallback(() => {
+    if (!website?.tags) return [];
+    if (Array.isArray(website.tags)) return website.tags;
+    if (typeof website.tags === 'string') {
+      return website.tags.split(',').map(t => t.trim()).filter(Boolean);
+    }
+    return [];
+  }, [website?.tags]);
+
   const handleSave = useCallback(async () => {
     if (!website) return;
     setSaving(true);
@@ -267,16 +277,6 @@ export default function PersonalWebsiteDetail() {
       </div>
     );
   }
-
-  // Helper to get current tags array
-  const getCurrentTags = () => {
-    if (!website.tags) return [];
-    if (Array.isArray(website.tags)) return website.tags;
-    if (typeof website.tags === 'string') {
-      return website.tags.split(',').map(t => t.trim()).filter(Boolean);
-    }
-    return [];
-  };
 
   // Helper to add a tag
   const addTag = async (tag) => {
