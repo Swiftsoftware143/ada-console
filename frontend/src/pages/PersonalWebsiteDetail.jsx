@@ -131,6 +131,50 @@ export default function PersonalWebsiteDetail() {
     try {
       console.log("Saving website:", id, "Current tags:", website.tags);
       
+      // Get current tags array
+      const currentTags = getCurrentTags();
+      
+      // Find any new tags that aren't in the Tag Manager yet
+      const newTags = currentTags.filter(tag => !availableTags.includes(tag));
+      
+      // Sync new tags to Tag Manager
+      if (newTags.length > 0) {
+        console.log("Syncing new tags to Tag Manager:", newTags);
+        try {
+          const { data: settingsData } = await supabase
+            .from("settings")
+            .select("value")
+            .eq("key", "tags")
+            .maybeSingle();
+          
+          let currentSettingsTags = [];
+          if (settingsData?.value) {
+            currentSettingsTags = typeof settingsData.value === 'string'
+              ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
+              : Array.isArray(settingsData.value) ? settingsData.value : [];
+          }
+          
+          const tagsToAdd = newTags.filter(tag => !currentSettingsTags.includes(tag));
+          if (tagsToAdd.length > 0) {
+            const updatedTags = [...currentSettingsTags, ...tagsToAdd];
+            await supabase
+              .from("settings")
+              .upsert({ 
+                key: "tags", 
+                value: updatedTags.join(", "),
+                updated_at: new Date().toISOString() 
+              });
+            console.log("Added new tags to Tag Manager:", tagsToAdd);
+          }
+          
+          // Update local available tags
+          setAvailableTags(prev => [...prev, ...newTags].sort());
+        } catch (e) {
+          console.error("Error syncing tags to Tag Manager:", e);
+          // Don't fail the save if tag sync fails
+        }
+      }
+      
       // Build update payload - match database schema exactly
       const updateData = {};
       
