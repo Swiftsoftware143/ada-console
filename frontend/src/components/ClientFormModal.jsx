@@ -88,13 +88,29 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
       );
       if (tagsToAdd.length > 0) {
         const updatedTags = [...currentTags, ...tagsToAdd];
-        await supabase
+        // Try update first, then insert if not exists
+        const { error: updateError } = await supabase
           .from("settings")
-          .upsert({ 
-            key: "tags", 
+          .update({ 
             value: updatedTags.join(", "),
             updated_at: new Date().toISOString() 
-          });
+          })
+          .eq("key", "tags");
+        
+        if (updateError) {
+          console.log("Update failed, trying insert:", updateError);
+          // If update fails, try insert
+          const { error: insertError } = await supabase
+            .from("settings")
+            .insert({ 
+              key: "tags", 
+              value: updatedTags.join(", "),
+              updated_at: new Date().toISOString() 
+            });
+          if (insertError) {
+            console.error("Insert also failed:", insertError);
+          }
+        }
       }
     } catch (e) {
       console.error("Error adding tags to settings:", e);

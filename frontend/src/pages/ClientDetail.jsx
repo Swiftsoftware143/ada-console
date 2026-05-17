@@ -173,13 +173,29 @@ export default function ClientDetail({ isPersonal = false }) {
           
           if (tagsToAdd.length > 0) {
             const updatedTags = [...currentSettingsTags, ...tagsToAdd];
-            await supabase
+            // Try update first, then insert if not exists
+            const { error: updateError } = await supabase
               .from("settings")
-              .upsert({ 
-                key: "tags", 
+              .update({ 
                 value: updatedTags.join(", "),
                 updated_at: new Date().toISOString() 
-              });
+              })
+              .eq("key", "tags");
+            
+            if (updateError) {
+              console.log("Update failed, trying insert:", updateError);
+              // If update fails, try insert
+              const { error: insertError } = await supabase
+                .from("settings")
+                .insert({ 
+                  key: "tags", 
+                  value: updatedTags.join(", "),
+                  updated_at: new Date().toISOString() 
+                });
+              if (insertError) {
+                console.error("Insert also failed:", insertError);
+              }
+            }
             console.log("Added new tags to Tag Manager:", tagsToAdd);
           }
           
@@ -326,13 +342,29 @@ export default function ClientDetail({ isPersonal = false }) {
       
       // Save to Tag Manager (settings) - store as comma-separated string
       try {
-        await supabase
+        // Try update first, then insert if not exists
+        const { error: updateError } = await supabase
           .from("settings")
-          .upsert({ 
-            key: "tags", 
+          .update({ 
             value: newTags.join(", "),
             updated_at: new Date().toISOString() 
-          });
+          })
+          .eq("key", "tags");
+        
+        if (updateError) {
+          console.log("Update failed, trying insert:", updateError);
+          // If update fails, try insert
+          const { error: insertError } = await supabase
+            .from("settings")
+            .insert({ 
+              key: "tags", 
+              value: newTags.join(", "),
+              updated_at: new Date().toISOString() 
+            });
+          if (insertError) {
+            console.error("Insert also failed:", insertError);
+          }
+        }
         console.log("Added new tag to Tag Manager:", tag);
       } catch (e) {
         console.error("Failed to save tag to Tag Manager:", e);

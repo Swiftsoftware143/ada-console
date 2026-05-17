@@ -163,15 +163,28 @@ function TagManagerCard() {
   const saveTags = async (newTags) => {
     setSaving(true);
     try {
-      const { error } = await supabase
+      // Try update first, then insert if not exists
+      const { error: updateError } = await supabase
         .from("settings")
-        .upsert({ 
-          key: "tags", 
+        .update({ 
           value: newTags.join(", "),
           updated_at: new Date().toISOString() 
-        });
+        })
+        .eq("key", "tags");
       
-      if (error) throw error;
+      if (updateError) {
+        console.log("Update failed, trying insert:", updateError);
+        // If update fails, try insert
+        const { error: insertError } = await supabase
+          .from("settings")
+          .insert({ 
+            key: "tags", 
+            value: newTags.join(", "),
+            updated_at: new Date().toISOString() 
+          });
+        if (insertError) throw insertError;
+      }
+      
       setTags(newTags);
       toast.success("Tags saved");
     } catch (e) {
