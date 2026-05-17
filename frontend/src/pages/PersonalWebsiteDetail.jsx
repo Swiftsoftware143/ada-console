@@ -227,6 +227,12 @@ export default function PersonalWebsiteDetail() {
       if (website.notes !== undefined) updateData.notes = website.notes || null;
       if (website.active !== undefined) updateData.active = Boolean(website.active);
       
+      // Include widget settings
+      if (website.widget_position !== undefined) updateData.widget_position = website.widget_position;
+      if (website.primary_color !== undefined) updateData.primary_color = website.primary_color;
+      if (website.enabled_profiles !== undefined) updateData.enabled_profiles = website.enabled_profiles;
+      if (website.enabled_features !== undefined) updateData.enabled_features = website.enabled_features;
+      
       console.log("Update payload:", updateData);
       
       const { data, error } = await supabase

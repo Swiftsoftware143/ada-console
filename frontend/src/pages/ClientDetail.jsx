@@ -227,6 +227,12 @@ export default function ClientDetail({ isPersonal = false }) {
       if (client.notes !== undefined) updateData.notes = client.notes || null;
       if (client.active !== undefined) updateData.active = Boolean(client.active);
       
+      // Include widget settings
+      if (client.widget_position !== undefined) updateData.widget_position = client.widget_position;
+      if (client.primary_color !== undefined) updateData.primary_color = client.primary_color;
+      if (client.enabled_profiles !== undefined) updateData.enabled_profiles = client.enabled_profiles;
+      if (client.enabled_features !== undefined) updateData.enabled_features = client.enabled_features;
+      
       console.log("Update payload:", updateData);
       
       // Use raw fetch to avoid Supabase client issues
