@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { LayoutDashboard, Users, Code2, Zap, Settings, Globe, Puzzle, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Code2, Zap, Settings, Globe, Puzzle, LogOut, User } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, testId: "nav-dashboard" },
@@ -60,6 +60,21 @@ export default function Sidebar() {
       </nav>
 
       <div className="px-3 py-4 border-t border-[#2e3245]">
+        {/* Profile link */}
+        <NavLink
+          to="/profile"
+          className={({ isActive }) =>
+            `group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 mb-2 ${
+              isActive
+                ? "bg-[#007bff]/12 text-white border border-[#007bff]/30 shadow-[0_0_15px_rgba(0,123,255,0.12)]"
+                : "text-[#94a3b8] hover:text-white hover:bg-[#1e2130] border border-transparent"
+            }`
+          }
+        >
+          <User className="h-4 w-4 shrink-0" />
+          <span>Profile</span>
+        </NavLink>
+        
         {/* User info */}
         {user && (
           <div className="px-3 mb-3">
