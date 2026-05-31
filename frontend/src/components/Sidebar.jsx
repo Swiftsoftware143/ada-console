@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Users, Code2, Zap, Settings, Globe, Puzzle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { LayoutDashboard, Users, Code2, Zap, Settings, Globe, Puzzle, LogOut } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, testId: "nav-dashboard" },
@@ -11,6 +12,8 @@ const navItems = [
 ];
 
 export default function Sidebar() {
+  const { signOut, user } = useAuth();
+
   return (
     <aside
       data-testid="sidebar"
@@ -55,6 +58,25 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      <div className="px-3 py-4 border-t border-[#2e3245]">
+        {/* User info */}
+        {user && (
+          <div className="px-3 mb-3">
+            <div className="text-xs text-[#64748b]">Signed in as</div>
+            <div className="text-sm text-white font-medium truncate">{user.email}</div>
+          </div>
+        )}
+        
+        {/* Sign out button */}
+        <button
+          onClick={signOut}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#94a3b8] hover:text-white hover:bg-[#1e2130] transition-all duration-200"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          <span>Sign Out</span>
+        </button>
+      </div>
 
       <div className="px-6 py-5 border-t border-[#2e3245]">
         <div className="text-[10px] uppercase tracking-[0.18em] text-[#64748b] font-semibold mb-1">
