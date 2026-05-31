@@ -20,15 +20,28 @@ export default function Login() {
     setError('')
     setLoading(true)
 
-    const { error } = await signIn(email, password)
+    try {
+      const { data, error: signInError } = await signIn(email, password)
 
-    if (error) {
-      setError(error.message)
+      if (signInError) {
+        setError(signInError.message || 'Invalid email or password')
+        setLoading(false)
+        return
+      }
+
+      if (!data?.user) {
+        setError('Login failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // Successful login
+      navigate('/')
+    } catch (err) {
+      console.error('Login error:', err)
+      setError(err.message || 'An unexpected error occurred. Please try again.')
       setLoading(false)
-      return
     }
-
-    navigate('/')
   }
 
   return (
