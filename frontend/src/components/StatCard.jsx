@@ -1,8 +1,11 @@
+import { DashboardCard } from "./DashboardCard";
+
 export default function StatCard({ label, value, icon: Icon, accentClass = "text-[#007bff]", testId }) {
   return (
-    <div
+    <DashboardCard
       data-testid={testId}
-      className="bg-[#1e2130] border border-[#2e3245] rounded-xl p-5 hover:border-[#3e445e] transition-colors duration-200"
+      hover
+      padding="normal"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-[#64748b]">
@@ -20,6 +23,6 @@ export default function StatCard({ label, value, icon: Icon, accentClass = "text
       >
         {value}
       </div>
-    </div>
+    </DashboardCard>
   );
 }
