@@ -21,7 +21,7 @@ export default function Sidebar() {
     >
       <div className="px-6 py-7 border-b border-[#2e3245]">
         <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-lg bg-[#007bff] grid place-items-center shadow-[0_0_20px_rgba(0,123,255,0.45)]">
+          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-red-500 to-red-600 grid place-items-center shadow-lg shadow-red-500/20">
             <Zap className="h-5 w-5 text-white" strokeWidth={2.5} />
           </div>
           <div className="leading-tight">
@@ -29,10 +29,10 @@ export default function Sidebar() {
               className="font-black text-white tracking-tight text-[15px]"
               style={{ fontFamily: "Outfit, sans-serif" }}
             >
-              SwiftImpact
+              ADASwift
             </div>
             <div className="text-[10px] uppercase tracking-[0.18em] text-[#64748b] font-semibold">
-              ADA Console
+              Widget Platform
             </div>
           </div>
         </div>
@@ -48,8 +48,8 @@ export default function Sidebar() {
             className={({ isActive }) =>
               `group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? "bg-[#007bff]/12 text-white border border-[#007bff]/30 shadow-[0_0_15px_rgba(0,123,255,0.12)]"
-                  : "text-[#94a3b8] hover:text-white hover:bg-[#1e2130] border border-transparent"
+                  ? "bg-red-500/10 text-white border border-red-500/30 shadow-lg shadow-red-500/10"
+                  : "text-[#94a3b8] hover:text-white hover:bg-white/5 border border-transparent"
               }`
             }
           >
@@ -66,8 +66,8 @@ export default function Sidebar() {
           className={({ isActive }) =>
             `group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 mb-2 ${
               isActive
-                ? "bg-[#007bff]/12 text-white border border-[#007bff]/30 shadow-[0_0_15px_rgba(0,123,255,0.12)]"
-                : "text-[#94a3b8] hover:text-white hover:bg-[#1e2130] border border-transparent"
+                ? "bg-red-500/10 text-white border border-red-500/30 shadow-lg shadow-red-500/10"
+                : "text-[#94a3b8] hover:text-white hover:bg-white/5 border border-transparent"
             }`
           }
         >
@@ -86,7 +86,7 @@ export default function Sidebar() {
         {/* Sign out button */}
         <button
           onClick={signOut}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#94a3b8] hover:text-white hover:bg-[#1e2130] transition-all duration-200"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#94a3b8] hover:text-white hover:bg-white/5 transition-all duration-200"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           <span>Sign Out</span>
@@ -95,10 +95,10 @@ export default function Sidebar() {
 
       <div className="px-6 py-5 border-t border-[#2e3245]">
         <div className="text-[10px] uppercase tracking-[0.18em] text-[#64748b] font-semibold mb-1">
-          Agency
+          Powered by
         </div>
         <div className="text-sm text-white font-medium">SwiftImpact Solutions</div>
-        <div className="text-xs text-[#64748b] mt-0.5">ADA Widget Platform</div>
+        <div className="text-xs text-[#64748b] mt-0.5">Making the web accessible</div>
       </div>
     </aside>
   );
