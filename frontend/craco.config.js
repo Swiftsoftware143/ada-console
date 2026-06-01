@@ -36,7 +36,8 @@ let webpackConfig = {
     alias: {
       '@': path.resolve(__dirname, 'src'),
     },
-    configure: (webpackConfig) => {
+    configure: (webpackConfig, { env }) => {
+      const isProduction = env === 'production';
 
       // Add ignored patterns to reduce watched directories
         webpackConfig.watchOptions = {
@@ -50,6 +51,34 @@ let webpackConfig = {
             '**/public/**',
         ],
       };
+
+      // Production optimizations
+      if (isProduction) {
+        // Enable tree shaking
+        webpackConfig.optimization.usedExports = true;
+        
+        // Split chunks for better caching
+        webpackConfig.optimization.splitChunks = {
+          chunks: 'all',
+          maxInitialRequests: 25,
+          minSize: 20000,
+          cacheGroups: {
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              chunks: 'all',
+            },
+            common: {
+              minChunks: 2,
+              chunks: 'all',
+              enforce: true,
+            },
+          },
+        };
+
+        // Minimize output
+        webpackConfig.optimization.minimize = true;
+      }
 
       // Add health check plugin to webpack if enabled
       if (config.enableHealthCheck && healthPluginInstance) {
