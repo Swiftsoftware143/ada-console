@@ -61,9 +61,11 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
+    "build:analyze": "npm run build && npx source-map-explorer 'build/static/js/*.js'",
     "test": "craco test",
     "analyze": "npm run build && npx serve -s build",
-    "optimize": "npm run build && npx serve -s build -l 3000"
+    "optimize": "npm run build && npx serve -s build -l 3000",
+    "type-check": "tsc --noEmit"
   },
   "browserslist": {
     "production": [
