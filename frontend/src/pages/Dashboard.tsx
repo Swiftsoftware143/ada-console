@@ -3,7 +3,7 @@ import { Layout, Activity, Users, Settings } from 'lucide-react';
 import { DashboardCard } from '../components/DashboardCard';
 import { StatCard } from '../components/StatCard';
 
-export const Dashboard: React.FC = () => {
+const Dashboard: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -73,3 +73,5 @@ export const Dashboard: React.FC = () => {
     </div>
   );
 };
+
+export default Dashboard;

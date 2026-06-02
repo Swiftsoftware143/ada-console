@@ -16,6 +16,7 @@ const PersonalWebsites = lazy(() => import("@/pages/PersonalWebsites"));
 const PersonalWebsiteDetail = lazy(() => import("@/pages/PersonalWebsiteDetail"));
 const WidgetRequests = lazy(() => import("@/pages/WidgetRequests"));
 const Profile = lazy(() => import("@/pages/Profile"));
+const PlanSettings = lazy(() => import("@/pages/PlanSettings"));
 
 // Loading component
 const PageLoader = () => (
@@ -52,6 +53,7 @@ function App() {
                 <Route path="/embed" element={<EmbedCodePage />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/plan-settings" element={<PlanSettings />} />
               </Route>
               
               {/* Redirect unknown routes to login */}
