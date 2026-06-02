@@ -111,7 +111,8 @@ export default function AutomationDashboard() {
     contact_name: "John Doe",
     business_name: "Acme Inc",
     domain: "acme.com",
-    plan_tier: "starter",
+    plan_tier: "Pro",
+    billing_period: "Monthly",
     embed_code: `<script>!function(){var s=document.createElement("script");s.src="https://app.adaswift.com/loader.js?v=2";s.setAttribute("data-domain","acme.com");s.async=!0;document.body.appendChild(s)}();</script>`
   });
   const [showPreview, setShowPreview] = useState(false);
@@ -579,6 +580,7 @@ export default function AutomationDashboard() {
                           .replace(/\{\{business_name\}\}/g, previewData.business_name)
                           .replace(/\{\{domain\}\}/g, previewData.domain)
                           .replace(/\{\{plan_tier\}\}/g, previewData.plan_tier)
+                          .replace(/\{\{billing_period\}\}/g, previewData.billing_period)
                           .replace(/\{\{embed_code\}\}/g, previewData.embed_code)
                       }}
                     />
@@ -623,7 +625,11 @@ export default function AutomationDashboard() {
                       </div>
                       <div className="flex items-center justify-between p-2 bg-[#1e2130] rounded">
                         <code className="text-[#007bff]">{"{{plan_tier}}"}</code>
-                        <span className="text-[#64748b]">Plan (starter/pro/etc)</span>
+                        <span className="text-[#64748b]">Plan (Basic/Starter/Pro/Growth)</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 bg-[#1e2130] rounded">
+                        <code className="text-[#007bff]">{"{{billing_period}}"}</code>
+                        <span className="text-[#64748b]">Monthly/Yearly</span>
                       </div>
                       <div className="flex items-center justify-between p-2 bg-[#1e2130] rounded">
                         <code className="text-[#007bff]">{"{{embed_code}}"}</code>

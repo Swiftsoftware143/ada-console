@@ -42,8 +42,13 @@ exports.handler = async (event, context) => {
     const contactName = data.customer_name || data.buyer_name || data.name || '';
     const businessName = data.business_name || data.company || contactName;
     const domain = data.website || data.domain || data.website_url || data.custom_website;
-    const planTier = data.product_name || data.plan_tier || 'starter';
+    const productName = data.product_name || data.plan_tier || 'starter';
     const transactionId = data.transaction_id || data.order_id || data.id;
+
+    // Parse plan tier and billing period from product name
+    // Expected formats: "Basic Monthly", "Pro Yearly", "Growth Monthly", etc.
+    const planTier = parsePlanTier(productName);
+    const billingPeriod = parseBillingPeriod(productName);
 
     // Validate required fields
     if (!contactEmail || !domain) {
@@ -208,7 +213,8 @@ exports.handler = async (event, context) => {
       .replace(/\{\{contact_name\}\}/g, contactName || contactEmail.split('@')[0])
       .replace(/\{\{business_name\}\}/g, businessName || contactName || 'Your Business')
       .replace(/\{\{domain\}\}/g, cleanDomain)
-      .replace(/\{\{plan_tier\}\}/g, planTier || 'starter')
+      .replace(/\{\{plan_tier\}\}/g, planTier)
+      .replace(/\{\{billing_period\}\}/g, billingPeriod)
       .replace(/\{\{embed_code\}\}/g, embedCode);
 
     // Get SMTP settings
@@ -338,6 +344,31 @@ async function sendEmail({ to, subject, htmlBody, smtpSettings }) {
   }
 }
 
+// Parse plan tier from product name (e.g., "Pro Monthly" -> "Pro")
+function parsePlanTier(productName) {
+  if (!productName) return 'starter';
+  const name = productName.toLowerCase();
+  
+  if (name.includes('basic')) return 'Basic';
+  if (name.includes('starter')) return 'Starter';
+  if (name.includes('pro')) return 'Pro';
+  if (name.includes('growth')) return 'Growth';
+  if (name.includes('enterprise')) return 'Enterprise';
+  
+  return 'Starter'; // default
+}
+
+// Parse billing period from product name (e.g., "Pro Monthly" -> "Monthly")
+function parseBillingPeriod(productName) {
+  if (!productName) return 'Monthly';
+  const name = productName.toLowerCase();
+  
+  if (name.includes('yearly') || name.includes('annual')) return 'Yearly';
+  if (name.includes('monthly')) return 'Monthly';
+  
+  return 'Monthly'; // default
+}
+
 // Default email template
 const defaultEmailTemplate = `<!DOCTYPE html>
 <html>
@@ -381,7 +412,7 @@ const defaultEmailTemplate = `<!DOCTYPE html>
       </ul>
       
       <h3>📊 Your Plan</h3>
-      <p><strong>{{plan_tier}}</strong></p>
+      <p><strong>{{plan_tier}}</strong> - {{billing_period}} Billing</p>
       
       <h3>Need Help?</h3>
       <p>Reply to this email or contact us at support@swiftimpactsolutions.com</p>
