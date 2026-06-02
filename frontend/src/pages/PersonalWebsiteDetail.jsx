@@ -109,7 +109,7 @@ export default function PersonalWebsiteDetail() {
     return () => {
       alive = false;
     };
-  }, [id, navigate, loadTags]);
+  }, [id, navigate, loadTags, loadCdnDomain]);
 
   const update = useCallback(
     (patch) => setWebsite((w) => ({ ...w, ...patch })),
