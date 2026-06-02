@@ -26,6 +26,8 @@ import { Loader2 } from "lucide-react";
 const initialState = {
   name: "",
   domain: "",
+  contact_email: "",
+  contact_name: "",
   plan_tier: "basic",
   tags: [],
   location: "",
@@ -71,6 +73,10 @@ export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated
     }
     if (!form.domain.trim()) {
       toast.error("Domain is required");
+      return;
+    }
+    if (!form.contact_email.trim()) {
+      toast.error("Contact email is required for scan reports and widget delivery");
       return;
     }
 
@@ -138,6 +144,8 @@ export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated
     const payload = {
       name: form.name.trim(),
       domain: cleanDomain(form.domain),
+      contact_email: form.contact_email.trim() || null,
+      contact_name: form.contact_name.trim() || null,
       plan_tier: form.plan_tier,
       tags: tagsString,
       location: form.location.trim() || null,
@@ -210,6 +218,33 @@ export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated
             <p className="text-xs text-[#64748b]">
               https://, www., and trailing slashes are stripped automatically.
             </p>
+          </div>
+
+          {/* Contact Info */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
+                Contact Name
+              </Label>
+              <Input
+                value={form.contact_name}
+                onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
+                placeholder="John Doe"
+                className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
+                Contact Email *
+              </Label>
+              <Input
+                type="email"
+                value={form.contact_email}
+                onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
+                placeholder="john@example.com"
+                className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b]"
+              />
+            </div>
           </div>
 
           {/* Tags Section */}

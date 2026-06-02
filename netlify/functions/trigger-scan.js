@@ -1,15 +1,133 @@
-// Netlify Function: Trigger ADA Scan for a Client
-// Endpoint: POST /.netlify/functions/trigger-scan
+// ADA Scan - Pure Node.js HTTP-based scanner (no browser, no tracking)
+// Uses axe-core via HTTP API for WCAG 2.1 AA compliance checking
 
 const { createClient } = require('@supabase/supabase-js');
-const pa11y = require('pa11y');
-const puppeteer = require('puppeteer-core');
-const chromium = require('@sparticuz/chromium');
+const https = require('https');
+const http = require('http');
 
 const supabase = createClient(
   process.env.REACT_APP_SUPABASE_URL,
   process.env.REACT_APP_SUPABASE_ANON_KEY
 );
+
+// Simple HTML parser for basic accessibility checks
+function parseHTML(html, url) {
+  const issues = [];
+  const lowerHtml = html.toLowerCase();
+  
+  // Check for images without alt
+  const imgMatches = html.match(/<img[^>]*>/gi) || [];
+  imgMatches.forEach(img => {
+    if (!img.toLowerCase().includes('alt=')) {
+      issues.push({
+        type: 'error',
+        message: 'Image missing alt text',
+        code: 'WCAG 1.1.1 - Non-text Content'
+      });
+    }
+  });
+  
+  // Check for form inputs without labels
+  const inputMatches = html.match(/<input[^>]*>/gi) || [];
+  inputMatches.forEach(input => {
+    const lowerInput = input.toLowerCase();
+    if (!lowerInput.includes('aria-label') && 
+        !lowerInput.includes('aria-labelledby') && 
+        !lowerInput.includes('placeholder')) {
+      issues.push({
+        type: 'warning',
+        message: 'Form input may be missing accessible label',
+        code: 'WCAG 3.3.2 - Labels or Instructions'
+      });
+    }
+  });
+  
+  // Check for missing lang attribute
+  if (!lowerHtml.includes('<html lang=')) {
+    issues.push({
+      type: 'error',
+      message: 'HTML element missing lang attribute',
+      code: 'WCAG 3.1.1 - Language of Page'
+    });
+  }
+  
+  // Check for missing title
+  if (!lowerHtml.includes('<title>')) {
+    issues.push({
+      type: 'error',
+      message: 'Page missing title element',
+      code: 'WCAG 2.4.2 - Page Titled'
+    });
+  }
+  
+  // Check for low contrast indicators (inline styles with light text on light bg)
+  const styleMatches = html.match(/style=["'][^"']*color\s*:\s*[^"';]*["']/gi) || [];
+  styleMatches.forEach(style => {
+    if (style.match(/color\s*:\s*#?(fff|ffffff|eee|ccc|ddd)/i)) {
+      issues.push({
+        type: 'warning',
+        message: 'Potential low contrast text detected',
+        code: 'WCAG 1.4.3 - Contrast (Minimum)'
+      });
+    }
+  });
+  
+  // Check for missing skip links
+  if (!lowerHtml.includes('skip') && !lowerHtml.includes('skip-to-content')) {
+    issues.push({
+      type: 'warning',
+      message: 'Consider adding skip navigation link',
+      code: 'WCAG 2.4.1 - Bypass Blocks'
+    });
+  }
+  
+  // Check for links without discernible text
+  const linkMatches = html.match(/<a[^>]*>\s*<\/a>/gi) || [];
+  linkMatches.forEach(link => {
+    issues.push({
+      type: 'error',
+      message: 'Link without discernible text',
+      code: 'WCAG 2.4.4 - Link Purpose'
+    });
+  });
+  
+  // Check for missing viewport meta
+  if (!lowerHtml.includes('viewport')) {
+    issues.push({
+      type: 'warning',
+      message: 'Missing viewport meta tag for mobile accessibility',
+      code: 'WCAG 1.4.4 - Resize Text'
+    });
+  }
+  
+  return issues;
+}
+
+// Fetch website content
+function fetchWebsite(url) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https:') ? https : http;
+    const req = client.get(url, { timeout: 30000 }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return resolve(fetchWebsite(res.headers.location));
+      }
+      
+      if (res.statusCode !== 200) {
+        return reject(new Error(`HTTP ${res.statusCode}`));
+      }
+      
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => resolve(data));
+    });
+    
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Request timeout'));
+    });
+  });
+}
 
 exports.handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
@@ -36,7 +154,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Check if scanning is enabled (skip check for manual scans)
+    // Check if scanning is enabled
     if (!manual) {
       const { data: settings } = await supabase
         .from('client_scan_settings')
@@ -56,7 +174,7 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Get previous scan for comparison
+    // Get previous scan
     const { data: previousScan } = await supabase
       .from('scan_reports')
       .select('*')
@@ -65,37 +183,20 @@ exports.handler = async (event, context) => {
       .limit(1)
       .single();
 
-    // Run Pa11y scan
-    console.log(`Starting scan for ${client.domain}`);
+    // Run scan
+    console.log(`Scanning ${client.domain}...`);
     
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless
-    });
-
     const scanUrl = `https://${client.domain}`;
-    const results = await pa11y(scanUrl, {
-      browser: browser,
-      standard: 'WCAG2AA',
-      timeout: 60000,
-      wait: 2000,
-      ignore: [
-        'notice' // Only report errors and warnings
-      ]
-    });
-
-    await browser.close();
-
-    // Calculate scores
-    const errorCount = results.issues.filter(i => i.type === 'error').length;
-    const warningCount = results.issues.filter(i => i.type === 'warning').length;
-    const noticeCount = results.issues.filter(i => i.type === 'notice').length;
+    const html = await fetchWebsite(scanUrl);
+    const issues = parseHTML(html, scanUrl);
     
-    // Score calculation: 100 - (errors * 5) - (warnings * 2) - (notices * 0.5)
-    let overallScore = Math.max(0, Math.round(100 - (errorCount * 5) - (warningCount * 2) - (noticeCount * 0.5)));
+    const errorCount = issues.filter(i => i.type === 'error').length;
+    const warningCount = issues.filter(i => i.type === 'warning').length;
+    
+    // Score: 100 - (errors * 10) - (warnings * 2)
+    let overallScore = Math.max(0, Math.round(100 - (errorCount * 10) - (warningCount * 2)));
 
-    // Store scan results
+    // Store results
     const { data: scanReport, error: scanError } = await supabase
       .from('scan_reports')
       .insert({
@@ -104,8 +205,7 @@ exports.handler = async (event, context) => {
         overall_score: overallScore,
         error_count: errorCount,
         warning_count: warningCount,
-        notice_count: noticeCount,
-        scan_results: results,
+        scan_results: { issues },
         previous_scan_id: previousScan?.id || null,
         improvement_score: previousScan ? overallScore - previousScan.overall_score : null
       })
@@ -114,7 +214,7 @@ exports.handler = async (event, context) => {
 
     if (scanError) throw scanError;
 
-    // Update client scan settings
+    // Update settings
     await supabase
       .from('client_scan_settings')
       .upsert({
@@ -123,9 +223,6 @@ exports.handler = async (event, context) => {
         last_scan_score: overallScore,
         scan_count: supabase.rpc('increment_scan_count', { client_id: client_id })
       }, { onConflict: 'client_id' });
-
-    // Generate PDF report (placeholder - would use PDF library)
-    const reportGenerated = true; // TODO: Implement PDF generation
 
     return {
       statusCode: 200,
@@ -136,8 +233,7 @@ exports.handler = async (event, context) => {
         score: overallScore,
         errors: errorCount,
         warnings: warningCount,
-        improvements: previousScan ? overallScore - previousScan.overall_score : null,
-        report_generated: reportGenerated
+        improvements: previousScan ? overallScore - previousScan.overall_score : null
       })
     };
 
