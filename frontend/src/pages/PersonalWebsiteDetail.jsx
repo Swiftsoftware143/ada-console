@@ -215,9 +215,15 @@ export default function PersonalWebsiteDetail() {
       if (website.domain) updateData.domain = cleanDomain(website.domain);
       if (website.plan_tier) updateData.plan_tier = website.plan_tier;
       
-      // Handle tags - database expects array
+      // Handle tags - database expects text (comma-separated), not array
       if (website.tags) {
-        updateData.tags = Array.isArray(website.tags) ? website.tags : [website.tags];
+        // If it's an array, convert to comma-separated string
+        if (Array.isArray(website.tags)) {
+          updateData.tags = website.tags.join(', ');
+        } else {
+          // Already a string, use as-is
+          updateData.tags = website.tags;
+        }
       } else {
         updateData.tags = null;
       }

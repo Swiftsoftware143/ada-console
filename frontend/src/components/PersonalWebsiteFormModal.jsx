@@ -132,14 +132,14 @@ export default function PersonalWebsiteFormModal({ open, onOpenChange, onCreated
       }
     }
     
-    // Store tags as PostgreSQL array
-    const tagsArray = form.tags.length > 0 ? form.tags : null;
+    // Store tags as comma-separated string
+    const tagsString = form.tags.length > 0 ? form.tags.join(', ') : null;
     
     const payload = {
       name: form.name.trim(),
       domain: cleanDomain(form.domain),
       plan_tier: form.plan_tier,
-      tags: tagsArray,
+      tags: tagsString,
       location: form.location.trim() || null,
       notes: form.notes.trim() || null,
       active: false,
