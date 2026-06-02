@@ -42,7 +42,7 @@ exports.handler = async (event, context) => {
     const firstName = data.first_name || '';
     const lastName = data.last_name || '';
     const contactName = `${firstName} ${lastName}`.trim() || data.customer_name || data.buyer_name || data.name || '';
-    const phoneNumber = data.phone_number || data.phone || '';
+    const phoneNumber = data.phone || data.phone_number || '';
     const companyName = data.Company || data.company || data.business_name || contactName;
     const domain = data['website URL'] || data.website || data.domain || data.website_url || data.custom_website;
     const productName = data.product_name || data.plan_tier || 'starter';
