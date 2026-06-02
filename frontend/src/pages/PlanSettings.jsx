@@ -99,17 +99,17 @@ export default function PlanSettings() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-4xl mx-auto bg-[#0f1117] min-h-screen">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Plan Settings</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-2xl font-bold text-white">Plan Settings</h1>
+        <p className="text-[#94a3b8] mt-1">
           Configure automatic plan assignment based on website page count
         </p>
       </div>
 
-      <Alert className="mb-6">
-        <Info className="h-4 w-4" />
-        <AlertDescription>
+      <Alert className="mb-6 bg-[#1e2130] border-[#2e3245] text-[#94a3b8]">
+        <Info className="h-4 w-4 text-[#007bff]" />
+        <AlertDescription className="text-[#94a3b8]">
           The widget automatically detects the number of pages on a website and assigns 
           the appropriate plan tier. Adjust the thresholds below to control plan assignment.
         </AlertDescription>
@@ -117,17 +117,17 @@ export default function PlanSettings() {
 
       <div className="grid gap-6">
         {/* Page Threshold Settings */}
-        <Card>
+        <Card className="bg-[#1e2130] border-[#2e3245]">
           <CardHeader>
-            <CardTitle>Page Count Thresholds</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-white">Page Count Thresholds</CardTitle>
+            <CardDescription className="text-[#94a3b8]">
               Set the maximum page count for each plan tier
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="basic_max">Basic Plan - Max Pages</Label>
+                <Label htmlFor="basic_max" className="text-[#94a3b8]">Basic Plan - Max Pages</Label>
                 <Input
                   id="basic_max"
                   type="number"
@@ -136,15 +136,15 @@ export default function PlanSettings() {
                   onChange={(e) =>
                     setThresholds({ ...thresholds, basic_max: parseInt(e.target.value) || 0 })
                   }
-                  className="bg-white"
+                  className="bg-[#0f1117] border-[#2e3245] text-white"
                 />
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-[#64748b]">
                   1-{thresholds.basic_max} pages
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="starter_max">Starter Plan - Max Pages</Label>
+                <Label htmlFor="starter_max" className="text-[#94a3b8]">Starter Plan - Max Pages</Label>
                 <Input
                   id="starter_max"
                   type="number"
@@ -153,15 +153,15 @@ export default function PlanSettings() {
                   onChange={(e) =>
                     setThresholds({ ...thresholds, starter_max: parseInt(e.target.value) || 0 })
                   }
-                  className="bg-white"
+                  className="bg-[#0f1117] border-[#2e3245] text-white"
                 />
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-[#64748b]">
                   {thresholds.basic_max + 1}-{thresholds.starter_max} pages
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="pro_max">Pro Plan - Max Pages</Label>
+                <Label htmlFor="pro_max" className="text-[#94a3b8]">Pro Plan - Max Pages</Label>
                 <Input
                   id="pro_max"
                   type="number"
@@ -170,15 +170,15 @@ export default function PlanSettings() {
                   onChange={(e) =>
                     setThresholds({ ...thresholds, pro_max: parseInt(e.target.value) || 0 })
                   }
-                  className="bg-white"
+                  className="bg-[#0f1117] border-[#2e3245] text-white"
                 />
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-[#64748b]">
                   {thresholds.starter_max + 1}-{thresholds.pro_max} pages
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="growth_max">Growth Plan - Max Pages</Label>
+                <Label htmlFor="growth_max" className="text-[#94a3b8]">Growth Plan - Max Pages</Label>
                 <Input
                   id="growth_max"
                   type="number"
@@ -187,27 +187,27 @@ export default function PlanSettings() {
                   onChange={(e) =>
                     setThresholds({ ...thresholds, growth_max: parseInt(e.target.value) || 0 })
                   }
-                  className="bg-white"
+                  className="bg-[#0f1117] border-[#2e3245] text-white"
                 />
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-[#64748b]">
                   {thresholds.pro_max + 1}-{thresholds.growth_max} pages
                 </p>
               </div>
             </div>
 
-            <div className="pt-4 border-t">
-              <p className="text-sm text-gray-600">
-                <strong>Enterprise:</strong> {thresholds.growth_max + 1}+ pages
+            <div className="pt-4 border-t border-[#2e3245]">
+              <p className="text-sm text-[#94a3b8]">
+                <strong className="text-white">Enterprise:</strong> {thresholds.growth_max + 1}+ pages
               </p>
             </div>
           </CardContent>
         </Card>
 
         {/* Plan Features Overview */}
-        <Card>
+        <Card className="bg-[#1e2130] border-[#2e3245]">
           <CardHeader>
-            <CardTitle>Plan Features</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-white">Plan Features</CardTitle>
+            <CardDescription className="text-[#94a3b8]">
               Overview of features available in each plan tier
             </CardDescription>
           </CardHeader>
@@ -216,15 +216,15 @@ export default function PlanSettings() {
               {Object.entries(planFeatures).map(([plan, details]) => (
                 <div
                   key={plan}
-                  className="p-4 rounded-lg border bg-gray-50"
+                  className="p-4 rounded-lg border border-[#2e3245] bg-[#0f1117]"
                 >
-                  <h3 className="font-semibold text-gray-900 capitalize mb-2">
+                  <h3 className="font-semibold text-white capitalize mb-2">
                     {plan}
                   </h3>
                   <div className="space-y-1 text-sm">
-                    <p className="text-gray-600">{details.price}</p>
-                    <p className="text-gray-600">{details.profiles} profiles</p>
-                    <p className="text-gray-500">{details.features}</p>
+                    <p className="text-[#94a3b8]">{details.price}</p>
+                    <p className="text-[#94a3b8]">{details.profiles} profiles</p>
+                    <p className="text-[#64748b]">{details.features}</p>
                   </div>
                 </div>
               ))}
@@ -233,11 +233,11 @@ export default function PlanSettings() {
         </Card>
 
         {/* Actions */}
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-3 pb-6">
           <Button
             variant="outline"
             onClick={handleReset}
-            className="gap-2"
+            className="gap-2 bg-transparent border-[#2e3245] text-white hover:bg-[#1a1d27]"
           >
             <RefreshCw className="w-4 h-4" />
             Reset to Defaults
@@ -245,7 +245,7 @@ export default function PlanSettings() {
           <Button
             onClick={handleSave}
             disabled={saving}
-            className="gap-2"
+            className="gap-2 bg-[#007bff] hover:bg-[#0056b3]"
           >
             {saving ? (
               <>
