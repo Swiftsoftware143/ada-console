@@ -2,6 +2,9 @@
 
 // This service worker is for ADASwift - caches assets for offline use
 
+// Workbox manifest placeholder - will be injected by build process
+self.__WB_MANIFEST = self.__WB_MANIFEST || [];
+
 const CACHE_NAME = 'adaswift-v1';
 const urlsToCache = [
   '/',
