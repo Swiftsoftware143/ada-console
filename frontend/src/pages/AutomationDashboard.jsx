@@ -259,7 +259,10 @@ export default function AutomationDashboard() {
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status, errorMessage) => {
+    if (errorMessage?.includes('Duplicate')) {
+      return <AlertCircle className="h-4 w-4 text-orange-500" />;
+    }
     switch (status) {
       case 'delivered': return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'sent': return <Mail className="h-4 w-4 text-blue-500" />;

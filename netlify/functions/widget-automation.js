@@ -45,6 +45,31 @@ exports.handler = async (event, context) => {
       .replace(/\/$/, '')
       .toLowerCase();
 
+    // CHECK FOR DUPLICATES: Prevent multiple emails to same domain within 24 hours
+    const { data: recentEmail } = await supabase
+      .from('widget_automation_log')
+      .select('id, email_sent_at, email_status')
+      .eq('domain', domain)
+      .eq('email_sent', true)
+      .gte('email_sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .order('email_sent_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentEmail) {
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          success: true,
+          message: 'Duplicate prevention: Email already sent to this domain within 24 hours',
+          log_id: recentEmail.id,
+          previously_sent_at: recentEmail.email_sent_at,
+          duplicate_prevented: true
+        }),
+        headers: { 'Content-Type': 'application/json' }
+      };
+    }
+
     // Check if automation is enabled
     const { data: enabledData } = await supabase
       .from('settings')
