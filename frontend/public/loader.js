@@ -4,12 +4,12 @@
   console.log('[ADA] Loader starting...');
 
   /* ── CONFIG ────────────────────────────────────────────────────────────── */
-  const SUPABASE_URL     = "https://fmwnswiwhgiofagqbkws.supabase.co"; // ← YOUR SUPABASE URL
-  const SUPABASE_ANON    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtd25zd2l3aGdpb2ZhZ3Fia3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MzYwMDcsImV4cCI6MjA5NDExMjAwN30.ZlhvVGjfisF8P7tLCzCheHhgKwJjBT3S9E5gALv8ugU";               // ← YOUR ANON KEY
+  const SUPABASE_URL     = "https://fmwnswiwhgiofagqbkws.supabase.co";
+  const SUPABASE_ANON    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtd25zd2l3aGdpb2ZhZ3Fia3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MzYwMDcsImV4cCI6MjA5NDExMjAwN30.ZlhvVGjfisF8P7tLCzCheHhgKwJjBT3S9E5gALv8ugU";
   const CURRENT_DOMAIN   = (document.currentScript && document.currentScript.getAttribute("data-domain"))
                            || window.location.hostname.replace(/^www\./, "");
   
-  // Extract root domain for subdomain matching (e.g., "sub.example.com" -> "example.com")
+  // Extract root domain for subdomain matching
   const ROOT_DOMAIN = CURRENT_DOMAIN.split('.').slice(-2).join('.');
   
   console.log('[ADA] Domain detected:', CURRENT_DOMAIN);
@@ -21,54 +21,159 @@
     return;
   }
 
-  /* ── FETCH CLIENT CONFIG FROM SUPABASE ─────────────────────────────────── */
-  // Try exact domain match first, then root domain match (for subdomains)
-  // This allows one widget config to work on main domain + all subdomains
-  const domainFilter = `domain=eq.${encodeURIComponent(CURRENT_DOMAIN)},domain=eq.${encodeURIComponent(ROOT_DOMAIN)}`;
-  
-  fetch(`${SUPABASE_URL}/rest/v1/clients?or=(${domainFilter})&select=*&limit=1`, {
-    headers: {
-      "apikey":        SUPABASE_ANON,
-      "Authorization": `Bearer ${SUPABASE_ANON}`,
-      "Content-Type":  "application/json"
-    }
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data && data.length) {
-      const client = data[0];
-      if (!client.active) return;        /* Widget is off — do nothing */
-      injectWidget(client);
-    } else {
-      // Try personal_websites table with same subdomain logic
-      return fetch(`${SUPABASE_URL}/rest/v1/personal_websites?or=(${domainFilter})&select=*&limit=1`, {
-        headers: {
-          "apikey":        SUPABASE_ANON,
-          "Authorization": `Bearer ${SUPABASE_ANON}`,
-          "Content-Type":  "application/json"
+  // Count pages on the current site
+  async function countPages() {
+    try {
+      // Method 1: Count unique links on the current page
+      const links = Array.from(document.querySelectorAll('a[href]'));
+      const internalLinks = links.filter(link => {
+        try {
+          const url = new URL(link.href);
+          return url.hostname === window.location.hostname;
+        } catch {
+          return false;
         }
-      }).then(r => r.json());
+      });
+      
+      // Get unique paths
+      const uniquePaths = new Set(internalLinks.map(link => {
+        try {
+          return new URL(link.href).pathname;
+        } catch {
+          return link.pathname;
+        }
+      }));
+      
+      // Estimate total pages (internal links + current page)
+      const estimatedPages = uniquePaths.size + 1;
+      
+      console.log('[ADA] Estimated pages:', estimatedPages);
+      return estimatedPages;
+    } catch (e) {
+      console.log('[ADA] Could not count pages:', e);
+      return 1; // Default to 1 page
     }
-  })
-  .then(data => {
-    console.log('[ADA] Client data:', data);
-    if (data && data.length) {
-      const client = data[0];
+  }
+
+  // Determine plan based on page count and admin settings
+  function determinePlan(pageCount, planSettings) {
+    const settings = planSettings || {
+      basic_max: 5,
+      pro_max: 25,
+      growth_max: 100
+    };
+    
+    if (pageCount <= settings.basic_max) return 'basic';
+    if (pageCount <= settings.pro_max) return 'pro';
+    if (pageCount <= settings.growth_max) return 'growth';
+    return 'enterprise';
+  }
+
+  /* ── FETCH CLIENT CONFIG FROM SUPABASE ─────────────────────────────────── */
+  async function loadWidget() {
+    const domainFilter = `domain=eq.${encodeURIComponent(CURRENT_DOMAIN)},domain=eq.${encodeURIComponent(ROOT_DOMAIN)}`;
+    
+    try {
+      // Fetch client config
+      const clientRes = await fetch(`${SUPABASE_URL}/rest/v1/clients?or=(${domainFilter})&select=*&limit=1`, {
+        headers: {
+          "apikey": SUPABASE_ANON,
+          "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json"
+        }
+      });
+      
+      let clientData = await clientRes.json();
+      
+      // If not found in clients, try personal_websites
+      if (!clientData || clientData.length === 0) {
+        const personalRes = await fetch(`${SUPABASE_URL}/rest/v1/personal_websites?or=(${domainFilter})&select=*&limit=1`, {
+          headers: {
+            "apikey": SUPABASE_ANON,
+            "Authorization": `Bearer ${SUPABASE_ANON}`,
+            "Content-Type": "application/json"
+          }
+        });
+        clientData = await personalRes.json();
+      }
+      
+      if (!clientData || clientData.length === 0) {
+        console.log('[ADA] No client found for domain:', CURRENT_DOMAIN);
+        return;
+      }
+      
+      const client = clientData[0];
       console.log('[ADA] Client found:', client.name, 'Active:', client.active);
+      
       if (!client.active) {
         console.log('[ADA] Client inactive, not loading widget');
         return;
       }
-      injectWidget(client);
-    } else {
-      console.log('[ADA] No client found for domain:', CURRENT_DOMAIN);
+      
+      // Fetch plan settings from admin
+      const settingsRes = await fetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.plan_thresholds&select=value&limit=1`, {
+        headers: {
+          "apikey": SUPABASE_ANON,
+          "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json"
+        }
+      });
+      
+      const settingsData = await settingsRes.json();
+      const planSettings = settingsData?.[0]?.value ? JSON.parse(settingsData[0].value) : null;
+      
+      // Count pages and determine dynamic plan
+      const pageCount = await countPages();
+      const detectedPlan = determinePlan(pageCount, planSettings);
+      
+      console.log('[ADA] Pages detected:', pageCount, 'Plan:', detectedPlan);
+      
+      // Use detected plan or client's assigned plan (whichever is higher)
+      const finalPlan = getHigherPlan(client.plan_tier, detectedPlan);
+      
+      // Update client record with detected plan
+      await fetch(`${SUPABASE_URL}/rest/v1/personal_websites?id=eq.${client.id}`, {
+        method: 'PATCH',
+        headers: {
+          "apikey": SUPABASE_ANON,
+          "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({
+          detected_plan: detectedPlan,
+          page_count: pageCount,
+          detected_at: new Date().toISOString()
+        })
+      });
+      
+      // Inject widget with final plan
+      injectWidget(client, finalPlan, pageCount);
+      
+    } catch (err) {
+      console.error('[ADA] Error loading widget:', err);
     }
-  })
-  .catch(() => {}); /* Silent fail — never break the client's site */
+  }
+  
+  // Plan hierarchy for comparison
+  const PLAN_HIERARCHY = {
+    'basic': 1,
+    'starter': 2,
+    'pro': 3,
+    'growth': 4,
+    'enterprise': 5
+  };
+  
+  function getHigherPlan(plan1, plan2) {
+    const p1 = PLAN_HIERARCHY[plan1] || 1;
+    const p2 = PLAN_HIERARCHY[plan2] || 1;
+    return p1 >= p2 ? plan1 : plan2;
+  }
 
   /* ── BUILD & INJECT WIDGET ─────────────────────────────────────────────── */
-  function injectWidget(cfg) {
-    console.log('[ADA] Injecting widget for:', cfg.name);
+  function injectWidget(cfg, planTier, pageCount) {
+    console.log('[ADA] Injecting widget for:', cfg.name, 'Plan:', planTier, 'Pages:', pageCount);
+    
     const AGENCY   = cfg.agency_name    || "SwiftImpact Solutions";
     const CTA_URL  = cfg.cta_url        || "https://swiftimpactsolutions.com/ada";
     const DOMAIN   = cfg.domain         || CURRENT_DOMAIN;
@@ -77,6 +182,18 @@
     const PROFILES = cfg.enabled_profiles || {};
     const FEATURES = cfg.enabled_features || {};
     const NS       = "si";
+
+    // Plan-based feature limits
+    const PLAN_LIMITS = {
+      'basic': { profiles: 3, features: 'basic' },
+      'starter': { profiles: 5, features: 'standard' },
+      'pro': { profiles: 8, features: 'advanced' },
+      'growth': { profiles: 10, features: 'full' },
+      'enterprise': { profiles: 999, features: 'unlimited' }
+    };
+    
+    const limits = PLAN_LIMITS[planTier] || PLAN_LIMITS['basic'];
+    console.log('[ADA] Plan limits:', limits);
 
     if (document.getElementById(`${NS}-aw-host`)) return;
 
@@ -149,6 +266,10 @@
         padding:13px 16px 10px; border-bottom:1px solid #e8e8e8;
       }
       #aw-header h2 { font-size:16px; font-weight:700; color:#1a1a1a; }
+      #aw-plan-badge {
+        font-size:10px; padding:2px 8px; border-radius:10px;
+        background:${COLOR}20; color:${COLOR}; font-weight:600; text-transform:uppercase;
+      }
       #aw-close {
         background:none; border:none; cursor:pointer; padding:4px;
         border-radius:6px; color:#555; line-height:1; transition:background .15s;
@@ -197,6 +318,10 @@
       .aw-btn .bicon { font-size:20px; }
       .aw-btn:hover { border-color:${COLOR}; background:#eef5ff; color:${COLOR}; }
       .aw-btn.active { border-color:${COLOR}; background:#ddeeff; color:${COLOR}; }
+      .aw-btn.aw-locked { opacity:0.5; cursor:not-allowed; position:relative; }
+      .aw-btn.aw-locked::after {
+        content:'🔒'; position:absolute; top:2px; right:2px; font-size:10px;
+      }
       .aw-slider-row { margin-bottom:10px; }
       .aw-slider-row label {
         display:flex; justify-content:space-between; align-items:center;
@@ -272,10 +397,31 @@
       #aw-powered { font-size:10px; color:#aaa; text-align:right; line-height:1.4; flex-shrink:0; }
       #aw-powered a { color:${COLOR}; text-decoration:none; font-weight:600; }
       #aw-powered a:hover { text-decoration:underline; }
+      .aw-upgrade-banner {
+        background:linear-gradient(135deg,${COLOR}20,${COLOR}10);
+        border:1px solid ${COLOR}40;
+        border-radius:8px;
+        padding:10px;
+        margin-bottom:12px;
+        font-size:11px;
+        color:#444;
+      }
+      .aw-upgrade-banner strong { color:${COLOR}; }
     `;
 
     const CLOSE_IC = `<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>`;
     const ACCESS_IC = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="4" r="2.5" fill="white"/><path d="M19 13v-2h-5.5l-.8-2.5c-.3-.8-1-1.3-1.8-1.3H9c-.8 0-1.5.5-1.8 1.2L5.5 13H3v2h3.5l1.7-5.2c.1-.3.4-.5.7-.5h1.5l.8 2.5c.3.8 1 1.3 1.8 1.3H19v5h-3v2h3c1.1 0 2-.9 2-2v-5c0-1.1-.9-2-2-2z" fill="white"/><path d="M7 17.5c0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5-2-4.5-4.5-4.5S7 15 7 17.5zm7 0c0 1.4-1.1 2.5-2.5 2.5S9 18.9 9 17.5s1.1-2.5 2.5-2.5 2.5 1.1 2.5 2.5z" fill="white"/></svg>`;
+
+    // Build profiles based on plan limits
+    const allProfiles = [
+      { id: 'epilepsy', icon: '⚡', name: 'Epilepsy Safe', desc: 'Stops animations & flashing', locked: false },
+      { id: 'cognitive', icon: '🧠', name: 'Cognitive', desc: 'Simplified interface', locked: false },
+      { id: 'adhd', icon: '🎯', name: 'ADHD Friendly', desc: 'Focus mode', locked: false },
+      { id: 'blindness', icon: '👁️', name: 'Blindness', desc: 'Screen reader optimized', locked: limits.profiles < 4 },
+      { id: 'visImpaired', icon: '👓', name: 'Visually Impaired', desc: 'Enhanced contrast', locked: limits.profiles < 5 },
+    ];
+    
+    const visibleProfiles = allProfiles.slice(0, limits.profiles);
 
     const tmpl = document.createElement("template");
     tmpl.innerHTML = `
@@ -286,7 +432,7 @@
 <div id="aw-vkb" role="toolbar" aria-label="Virtual Keyboard">
   <button id="aw-vkb-close">✕ Close Keyboard</button>
   <div class="aw-kb-row">
-    ${"`~1!2@3#4$5%6^7&8*9(0)-_=+".split("").map(k=>`<button class="aw-key" data-k="${k}">${k}</button>`).join("")}
+    ${"\`~1!2@3#4\$5%6^7&8*9(0)-_=+".split("").map(k=>`<button class="aw-key" data-k="${k}">${k}</button>`).join("")}
     <button class="aw-key wide" data-k="Backspace">⌫</button>
   </div>
   <div class="aw-kb-row">
@@ -314,313 +460,80 @@
 <button id="aw-trigger" aria-label="Open Accessibility Menu" aria-expanded="false" aria-haspopup="dialog">
   ${ACCESS_IC}
 </button>
-<div id="aw-panel" class="aw-hidden" role="dialog" aria-modal="true" aria-label="Accessibility Menu">
-  <a id="aw-cta" href="${CTA_URL}" target="_blank" rel="noopener noreferrer">
-    <strong>♿ Get a free ADA audit</strong>
+<div id="aw-panel" class="aw-hidden" role="dialog" aria-label="Accessibility Options">
+  <a id="aw-cta" href="${CTA_URL}" target="_blank" rel="noopener">
+    <strong>${AGENCY}</strong>
+    <span>Get ADA Compliant Today →</span>
   </a>
   <div id="aw-header">
-    <h2>Accessibility Menu</h2>
+    <div>
+      <h2>Accessibility</h2>
+      <span id="aw-plan-badge">${planTier}</span>
+    </div>
     <button id="aw-close" aria-label="Close">${CLOSE_IC}</button>
   </div>
-  <div id="aw-tabs" role="tablist">
-    <button class="aw-tab active" data-tab="profiles" role="tab" aria-selected="true">Profiles</button>
-    <button class="aw-tab" data-tab="content" role="tab" aria-selected="false">Content</button>
-    <button class="aw-tab" data-tab="visual" role="tab" aria-selected="false">Visual</button>
+  <div id="aw-tabs">
+    <button class="aw-tab active" data-tab="profiles">Profiles</button>
+    <button class="aw-tab" data-tab="content">Content</button>
+    <button class="aw-tab" data-tab="display">Display</button>
   </div>
   <div id="aw-body">
-    <div class="aw-pane active" data-pane="profiles">
-      <p class="aw-section-label">Disability Profiles</p>
+    ${limits.features !== 'unlimited' ? `
+    <div class="aw-upgrade-banner">
+      <strong>${planTier} Plan</strong> — ${pageCount} pages detected. 
+      ${limits.features === 'basic' ? 'Upgrade for more features!' : 'Upgrade for unlimited access!'}
+    </div>
+    ` : ''}
+    <div class="aw-pane active" id="pane-profiles">
+      <div class="aw-section-label">Accessibility Profiles</div>
       <div class="aw-profiles">
-        ${PROFILES.epilepsy?'<button class="aw-profile-btn" data-profile="epilepsy"><span class="icon">⚡</span><span class="info"><strong>Epilepsy Safe</strong><span>Stops flashing animations & flickering content.</span></span></button>':''}
-        ${PROFILES.cognitive?'<button class="aw-profile-btn" data-profile="cognitive"><span class="icon">🧩</span><span class="info"><strong>Cognitive Disability</strong><span>Simplifies layout and boosts readability.</span></span></button>':''}
-        ${PROFILES.adhd?'<button class="aw-profile-btn" data-profile="adhd"><span class="icon">🎯</span><span class="info"><strong>ADHD Friendly</strong><span>Highlights focus areas, reduces distractions.</span></span></button>':''}
-        ${PROFILES.blindness?'<button class="aw-profile-btn" data-profile="blindness"><span class="icon">🦯</span><span class="info"><strong>Blindness Mode</strong><span>Optimizes for screen readers.</span></span></button>':''}
-        ${PROFILES.visImpaired?'<button class="aw-profile-btn" data-profile="visImpaired"><span class="icon">👁️</span><span class="info"><strong>Visually Impaired</strong><span>Large text, high contrast, magnified cursor.</span></span></button>':''}
+        ${visibleProfiles.map(p => `
+          <button class="aw-profile-btn${p.locked ? ' aw-locked' : ''}" data-profile="${p.id}"${p.locked ? ' disabled' : ''}>
+            <span class="icon">${p.icon}</span>
+            <div class="info">
+              <strong>${p.name}</strong>
+              <span>${p.desc}${p.locked ? ' (Upgrade to unlock)' : ''}</span>
+            </div>
+          </button>
+        `).join('')}
       </div>
     </div>
-    <div class="aw-pane" data-pane="content">
-      <p class="aw-section-label">Orientation</p>
+    <div class="aw-pane" id="pane-content">
+      <div class="aw-section-label">Content Adjustments</div>
       <div class="aw-grid">
-        <button class="aw-btn" data-toggle="cursor" data-val="black"><span class="bicon">🖱️</span>Big Black Cursor</button>
-        <button class="aw-btn" data-toggle="cursor" data-val="white"><span class="bicon">🖱️</span>Big White Cursor</button>
-        ${FEATURES.readingGuide?'<button class="aw-btn" data-toggle="readingGuide"><span class="bicon">📏</span>Reading Guide</button>':''}
-        ${FEATURES.readingMask?'<button class="aw-btn" data-toggle="readingMask"><span class="bicon">🎭</span>Reading Mask</button>':''}
+        <button class="aw-btn" data-feat="readableFont"><span class="bicon">🔤</span>Readable Font</button>
+        <button class="aw-btn" data-feat="dyslexia"><span class="bicon">🔠</span>Dyslexia Friendly</button>
+        <button class="aw-btn" data-feat="highlightTitles"><span class="bicon">📌</span>Highlight Titles</button>
+        <button class="aw-btn" data-feat="highlightLinks"><span class="bicon">🔗</span>Highlight Links</button>
+        <button class="aw-btn${limits.features === 'basic' ? ' aw-locked' : ''}" data-feat="stopAnimations"${limits.features === 'basic' ? ' disabled' : ''}><span class="bicon">⏹️</span>Stop Animations${limits.features === 'basic' ? '<br><small>(Upgrade)</small>' : ''}</button>
+        <button class="aw-btn${limits.features === 'basic' ? ' aw-locked' : ''}" data-feat="muteSounds"${limits.features === 'basic' ? ' disabled' : ''}><span class="bicon">🔇</span>Mute Sounds${limits.features === 'basic' ? '<br><small>(Upgrade)</small>' : ''}</button>
+        <button class="aw-btn${limits.features === 'basic' ? ' aw-locked' : ''}" data-feat="hideImages"${limits.features === 'basic' ? ' disabled' : ''}><span class="bicon">🖼️</span>Hide Images${limits.features === 'basic' ? '<br><small>(Upgrade)</small>' : ''}</button>
+        <button class="aw-btn${limits.features !== 'unlimited' ? ' aw-locked' : ''}" data-feat="virtualKeyboard"${limits.features !== 'unlimited' ? ' disabled' : ''}><span class="bicon">⌨️</span>Virtual Keyboard${limits.features !== 'unlimited' ? '<br><small>(Enterprise)</small>' : ''}</button>
       </div>
-      <p class="aw-section-label">Content Tools</p>
-      <div class="aw-grid">
-        ${FEATURES.readableFont?'<button class="aw-btn" data-toggle="readableFont"><span class="bicon">🔤</span>Readable Font</button>':''}
-        ${FEATURES.dyslexia?'<button class="aw-btn" data-toggle="dyslexia"><span class="bicon">📖</span>Dyslexia Friendly</button>':''}
-        ${FEATURES.highlightTitles?'<button class="aw-btn" data-toggle="highlightTitles"><span class="bicon">🔆</span>Highlight Titles</button>':''}
-        ${FEATURES.highlightLinks?'<button class="aw-btn" data-toggle="highlightLinks"><span class="bicon">🔗</span>Highlight Links</button>':''}
-        ${FEATURES.stopAnimations?'<button class="aw-btn" data-toggle="stopAnimations"><span class="bicon">⏸️</span>Stop Animations</button>':''}
-        ${FEATURES.muteSounds?'<button class="aw-btn" data-toggle="muteSounds"><span class="bicon">🔇</span>Mute Sounds</button>':''}
-        <button class="aw-btn${FEATURES.hideImages?' active':''}" data-toggle="hideImages"><span class="bicon">🚫</span>Hide Images</button>
-        <button class="aw-btn${FEATURES.virtualKeyboard?' active':''}" data-toggle="virtualKeyboard"><span class="bicon">⌨️</span>Virtual Keyboard</button>
-      </div>
-      <p class="aw-section-label">Text Alignment</p>
+      <div class="aw-section-label">Text Alignment</div>
       <div class="aw-align-row">
-        <button class="aw-align-btn" data-align="left" aria-label="Align Left">&#8676;</button>
-        <button class="aw-align-btn" data-align="center" aria-label="Align Center">&#8644;</button>
-        <button class="aw-align-btn" data-align="right" aria-label="Align Right">&#8677;</button>
-      </div>
-      <p class="aw-section-label" style="margin-top:14px;">Size &amp; Spacing</p>
-      <div class="aw-slider-row">
-        <label>Font Size <span id="val-fontSize">100%</span></label>
-        <input type="range" id="sl-fontSize" min="75" max="200" step="5" value="100" aria-label="Font size">
-        <div class="aw-slider-btns"><button data-sl="fontSize" data-d="-5">− Decrease</button><button data-sl="fontSize" data-d="5">+ Increase</button></div>
-      </div>
-      <div class="aw-slider-row">
-        <label>Line Height <span id="val-lineHeight">100%</span></label>
-        <input type="range" id="sl-lineHeight" min="100" max="250" step="10" value="100" aria-label="Line height">
-        <div class="aw-slider-btns"><button data-sl="lineHeight" data-d="-10">− Decrease</button><button data-sl="lineHeight" data-d="10">+ Increase</button></div>
-      </div>
-      <div class="aw-slider-row">
-        <label>Letter Spacing <span id="val-letterSpacing">0px</span></label>
-        <input type="range" id="sl-letterSpacing" min="0" max="10" step="1" value="0" aria-label="Letter spacing">
-        <div class="aw-slider-btns"><button data-sl="letterSpacing" data-d="-1">− Decrease</button><button data-sl="letterSpacing" data-d="1">+ Increase</button></div>
+        <button class="aw-align-btn" data-align="left">⬅️</button>
+        <button class="aw-align-btn" data-align="center">⬆️</button>
+        <button class="aw-align-btn" data-align="right">➡️</button>
       </div>
     </div>
-    <div class="aw-pane" data-pane="visual">
-      <p class="aw-section-label">Contrast Modes (mutually exclusive)</p>
-      <div class="aw-grid">
-        <button class="aw-btn" data-toggle="contrast" data-val="dark"><span class="bicon">🌑</span>Dark Contrast</button>
-        <button class="aw-btn" data-toggle="contrast" data-val="mono"><span class="bicon">◑</span>Monochrome</button>
-        <button class="aw-btn" data-toggle="contrast" data-val="highSat"><span class="bicon">🎨</span>High Saturation</button>
-        <button class="aw-btn" data-toggle="contrast" data-val="lowSat"><span class="bicon">🩶</span>Low Saturation</button>
+    <div class="aw-pane" id="pane-display">
+      <div class="aw-section-label">Display & Colors</div>
+      <div class="aw-slider-row">
+        <label>Font Size <span id="val-fs">100%</span></label>
+        <input type="range" id="rng-fs" min="75" max="150" value="100">
+        <div class="aw-slider-btns">
+          <button data-reset="fontSize">Reset</button>
+        </div>
       </div>
-      <p class="aw-section-label">Color Adjustments</p>
-      <div class="aw-color-row"><span>Text Color</span><input type="color" id="cp-text" value="#000000" aria-label="Text color"><button data-cp-reset="text">Reset</button></div>
-      <div class="aw-color-row"><span>Title Color</span><input type="color" id="cp-title" value="#000000" aria-label="Title color"><button data-cp-reset="title">Reset</button></div>
-      <div class="aw-color-row"><span>Background</span><input type="color" id="cp-bg" value="#ffffff" aria-label="Background color"><button data-cp-reset="bg">Reset</button></div>
-    </div>
-  </div>
-  <div id="aw-footer">
-    <button id="aw-reset">↺ Reset All Settings</button>
-    <div id="aw-powered">Powered by<br><a href="${CTA_URL}" target="_blank" rel="noopener">${AGENCY}</a></div>
-  </div>
-</div>`;
-
-    shadow.appendChild(tmpl.content.cloneNode(true));
-
-    const $  = sel => shadow.querySelector(sel);
-    const $$ = sel => shadow.querySelectorAll(sel);
-    const panel    = $("#aw-panel");
-    const trigger  = $("#aw-trigger");
-    const closeBtn = $("#aw-close");
-    const rguide   = $("#aw-rguide");
-    const rmaskTop = $("#aw-rmask-top");
-    const rmaskBot = $("#aw-rmask-bot");
-    const vkb      = $("#aw-vkb");
-
-    const pageStyle = document.createElement("style");
-    pageStyle.id = `${NS}-aw-page-style`;
-    document.head.appendChild(pageStyle);
-
-    const PROFILE_EFFECTS = {
-      epilepsy:   () => { applyToggle("stopAnimations", true); },
-      cognitive:  () => { applyToggle("readableFont", true); S.fontSize = Math.max(S.fontSize, 110); applySliders(); },
-      adhd:       () => { applyToggle("readingGuide", true); applyToggle("highlightLinks", true); },
-      blindness:  () => { applyToggle("hideImages", true); applyToggle("highlightTitles", true); applyToggle("highlightLinks", true); },
-      visImpaired:() => { S.fontSize = Math.max(S.fontSize, 125); applySliders(); applyContrast("dark"); S.cursor = "black"; applyCursor(); },
-    };
-
-    function renderPageCSS() {
-      const rules = [];
-      if (S.readableFont)    rules.push(`body,body *{font-family:'Georgia',serif!important;}`);
-      if (S.dyslexia)        rules.push(`@import url('https://fonts.googleapis.com/css2?family=Lexend&display=swap');body,body *{font-family:'Lexend',sans-serif!important;letter-spacing:.06em!important;word-spacing:.18em!important;}`);
-      if (S.highlightTitles) rules.push(`h1,h2,h3,h4,h5,h6{background:rgba(0,123,255,.15)!important;border-left:4px solid ${COLOR}!important;padding-left:6px!important;}`);
-      if (S.highlightLinks)  rules.push(`a{background:rgba(255,200,0,.25)!important;outline:2px solid #cc8800!important;}`);
-      if (S.stopAnimations)  rules.push(`*,*::before,*::after{animation:none!important;transition:none!important;}`);
-      if (S.hideImages)      rules.push(`img,picture,figure,video,canvas{visibility:hidden!important;}`);
-      if (S.contrast==="dark")    rules.push(`html{filter:invert(1) hue-rotate(180deg)!important;}img,video,canvas{filter:invert(1) hue-rotate(180deg)!important;}`);
-      if (S.contrast==="mono")    rules.push(`html{filter:grayscale(1)!important;}`);
-      if (S.contrast==="highSat") rules.push(`html{filter:saturate(3)!important;}`);
-      if (S.contrast==="lowSat")  rules.push(`html{filter:saturate(.3)!important;}`);
-      if (S.textAlign)  rules.push(`body,body *{text-align:${S.textAlign}!important;}`);
-      if (S.textColor)  rules.push(`body,p,li,td,span{color:${S.textColor}!important;}`);
-      if (S.titleColor) rules.push(`h1,h2,h3,h4,h5,h6{color:${S.titleColor}!important;}`);
-      if (S.bgColor)    rules.push(`body{background-color:${S.bgColor}!important;}`);
-      pageStyle.textContent = rules.join("\n");
-    }
-
-    function applySliders() {
-      const fs=S.fontSize, lh=S.lineHeight, ls=S.letterSpacing;
-      let h="";
-      if(fs!==100) h+=`font-size:${fs}%!important;`;
-      if(lh!==100) h+=`line-height:${lh/100}!important;`;
-      if(ls!==0)   h+=`letter-spacing:${ls}px!important;`;
-      document.documentElement.style.cssText=h;
-      const fsEl=$("#val-fontSize"),lhEl=$("#val-lineHeight"),lsEl=$("#val-letterSpacing");
-      if(fsEl) fsEl.textContent=fs+"%";
-      if(lhEl) lhEl.textContent=lh+"%";
-      if(lsEl) lsEl.textContent=ls+"px";
-      const slFs=$("#sl-fontSize"),slLh=$("#sl-lineHeight"),slLs=$("#sl-letterSpacing");
-      if(slFs) slFs.value=fs;
-      if(slLh) slLh.value=lh;
-      if(slLs) slLs.value=ls;
-    }
-
-    function applyCursor() {
-      if(S.cursor==="black") document.body.style.cursor=toCursor(SVG_BLACK);
-      else if(S.cursor==="white") document.body.style.cursor=toCursor(SVG_WHITE);
-      else document.body.style.cursor="";
-      $$(".aw-btn[data-toggle='cursor']").forEach(b=>b.classList.toggle("active",b.dataset.val===S.cursor));
-    }
-
-    function applyContrast(val) {
-      S.contrast=(S.contrast===val)?null:val;
-      $$(".aw-btn[data-toggle='contrast']").forEach(b=>b.classList.toggle("active",b.dataset.val===S.contrast));
-      renderPageCSS();
-    }
-
-    function applyToggle(key,forceOn) {
-      if(forceOn!==undefined) S[key]=forceOn;
-      else S[key]=!S[key];
-      const btn=$(`[data-toggle='${key}']`);
-      if(btn) btn.classList.toggle("active",S[key]);
-      if(key==="readingGuide") rguide.style.display=S.readingGuide?"block":"none";
-      if(key==="readingMask")  { rmaskTop.style.display=S.readingMask?"block":"none"; rmaskBot.style.display=S.readingMask?"block":"none"; }
-      if(key==="muteSounds")   document.querySelectorAll("audio,video").forEach(m=>m.muted=S.muteSounds);
-      if(key==="virtualKeyboard") vkb.classList.toggle("visible",S.virtualKeyboard);
-      renderPageCSS();
-    }
-
-    document.addEventListener("mousemove",e=>{
-      if(S.readingGuide){rguide.style.top=(e.clientY-1)+"px";rguide.style.display="block";}
-      if(S.readingMask){const h=60;rmaskTop.style.top="0";rmaskTop.style.height=Math.max(0,e.clientY-h)+"px";rmaskBot.style.top=(e.clientY+h)+"px";rmaskBot.style.bottom="0";rmaskBot.style.height="auto";}
-    });
-
-    function openPanel()  { S.open=true;  panel.classList.remove("aw-hidden"); trigger.setAttribute("aria-expanded","true");  closeBtn.focus(); }
-    function closePanel() { S.open=false; panel.classList.add("aw-hidden");    trigger.setAttribute("aria-expanded","false"); trigger.focus(); }
-
-    trigger.addEventListener("click",()=>{
-      console.log('[ADA] Widget button clicked, open:', !S.open);
-      S.open?closePanel():openPanel();
-    });
-    closeBtn.addEventListener("click",closePanel);
-    document.addEventListener("click",e=>{ if(S.open&&!host.contains(e.target)) closePanel(); });
-    document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&S.open) closePanel(); });
-
-    $$(".aw-tab").forEach(tab=>{
-      tab.addEventListener("click",()=>{
-        S.tab=tab.dataset.tab;
-        $$(".aw-tab").forEach(t=>{t.classList.remove("active");t.setAttribute("aria-selected","false");});
-        tab.classList.add("active");tab.setAttribute("aria-selected","true");
-        $$(".aw-pane").forEach(p=>p.classList.remove("active"));
-        $(`[data-pane="${S.tab}"]`).classList.add("active");
-      });
-    });
-
-    $$(".aw-profile-btn").forEach(btn=>{
-      btn.addEventListener("click",()=>{
-        const key=btn.dataset.profile;
-        S[key]=!S[key];
-        btn.classList.toggle("active",S[key]);
-        if(S[key]&&PROFILE_EFFECTS[key]) PROFILE_EFFECTS[key]();
-        renderPageCSS();
-      });
-    });
-
-    shadow.addEventListener("click",e=>{
-      const btn=e.target.closest("[data-toggle]");
-      if(!btn) return;
-      const toggle=btn.dataset.toggle,val=btn.dataset.val;
-      if(toggle==="cursor"){S.cursor=(S.cursor===val)?null:val;applyCursor();return;}
-      if(toggle==="contrast"){applyContrast(val);return;}
-      applyToggle(toggle);
-    });
-
-    $$(".aw-align-btn").forEach(btn=>{
-      btn.addEventListener("click",()=>{
-        const a=btn.dataset.align;
-        S.textAlign=(S.textAlign===a)?null:a;
-        $$(".aw-align-btn").forEach(b=>b.classList.toggle("active",b.dataset.align===S.textAlign));
-        renderPageCSS();
-      });
-    });
-
-    [["fontSize"],["lineHeight"],["letterSpacing"]].forEach(([key])=>{
-      const sl=$(`#sl-${key}`);
-      if(!sl) return;
-      sl.addEventListener("input",()=>{S[key]=parseFloat(sl.value);applySliders();});
-    });
-
-    shadow.addEventListener("click",e=>{
-      const btn=e.target.closest("[data-sl]");
-      if(!btn) return;
-      const key=btn.dataset.sl,d=parseFloat(btn.dataset.d);
-      const sl=$(`#sl-${key}`);
-      S[key]=Math.min(parseFloat(sl.max),Math.max(parseFloat(sl.min),S[key]+d));
-      applySliders();
-    });
-
-    [["cp-text","textColor"],["cp-title","titleColor"],["cp-bg","bgColor"]].forEach(([id,key])=>{
-      const inp=$(`#${id}`);
-      if(!inp) return;
-      inp.addEventListener("input",()=>{S[key]=inp.value;renderPageCSS();});
-    });
-
-    shadow.addEventListener("click",e=>{
-      const btn=e.target.closest("[data-cp-reset]");
-      if(!btn) return;
-      const map={text:"textColor",title:"titleColor",bg:"bgColor"};
-      const idMap={text:"cp-text",title:"cp-title",bg:"cp-bg"};
-      const key=btn.getAttribute("data-cp-reset");
-      S[map[key]]="";
-      const inp=$(`#${idMap[key]}`);
-      if(inp) inp.value=(key==="bg")?"#ffffff":"#000000";
-      renderPageCSS();
-    });
-
-    vkb.addEventListener("click",e=>{
-      const key=e.target.closest("[data-k]");
-      if(!key) return;
-      const k=key.dataset.k;
-      const focused=document.activeElement;
-      if(focused&&(focused.tagName==="INPUT"||focused.tagName==="TEXTAREA")){
-        const start=focused.selectionStart,end=focused.selectionEnd;
-        if(k==="Backspace"){focused.value=focused.value.slice(0,Math.max(0,start-1))+focused.value.slice(end);focused.selectionStart=focused.selectionEnd=Math.max(0,start-1);}
-        else if(k==="Enter"){focused.value=focused.value.slice(0,start)+"\n"+focused.value.slice(end);focused.selectionStart=focused.selectionEnd=start+1;}
-        else if(k==="Tab"){focused.value=focused.value.slice(0,start)+"\t"+focused.value.slice(end);focused.selectionStart=focused.selectionEnd=start+1;}
-        else if(k.length===1||k===" "){focused.value=focused.value.slice(0,start)+k+focused.value.slice(end);focused.selectionStart=focused.selectionEnd=start+1;}
-      }
-    });
-
-    $("#aw-vkb-close").addEventListener("click",()=>{
-      S.virtualKeyboard=false;
-      vkb.classList.remove("visible");
-      const b=$("[data-toggle='virtualKeyboard']");
-      if(b) b.classList.remove("active");
-    });
-
-    $("#aw-reset").addEventListener("click",()=>{
-      Object.assign(S,{
-        epilepsy:false,cognitive:false,adhd:false,blindness:false,visImpaired:false,
-        cursor:null,contrast:null,textAlign:null,
-        readableFont:false,dyslexia:false,highlightTitles:false,highlightLinks:false,
-        stopAnimations:false,muteSounds:false,hideImages:false,virtualKeyboard:false,
-        readingGuide:false,readingMask:false,
-        fontSize:100,lineHeight:100,letterSpacing:0,
-        textColor:"",titleColor:"",bgColor:"",
-      });
-      pageStyle.textContent="";
-      document.documentElement.style.cssText="";
-      document.body.style.cursor="";
-      document.querySelectorAll("audio,video").forEach(m=>m.muted=false);
-      rguide.style.display="none";
-      rmaskTop.style.display="none";
-      rmaskBot.style.display="none";
-      vkb.classList.remove("visible");
-      $$(".aw-profile-btn,.aw-btn,.aw-align-btn").forEach(b=>b.classList.remove("active"));
-      applySliders();
-      const cpT=$("#cp-text"),cpH=$("#cp-title"),cpB=$("#cp-bg");
-      if(cpT) cpT.value="#000000";
-      if(cpH) cpH.value="#000000";
-      if(cpB) cpB.value="#ffffff";
-    });
-
-    /* Widget loaded - all features start disabled, user must toggle them on */
-    console.log('[ADA] Widget ready - waiting for user interaction');
-  }
-
-})();
+      <div class="aw-slider-row">
+        <label>Line Height <span id="val-lh">100%</span></label>
+        <input type="range" id="rng-lh" min="100" max="200" value="100">
+        <div class="aw-slider-btns">
+          <button data-reset="lineHeight">Reset</button>
+        </div>
+      </div>
+      <div class="aw-slider-row">
+        <label>Letter Spacing <span id="val-ls">0px</span></label>
+        <input type="range" id="rng-ls" min="0" max="10" value="0">
+        <div class
