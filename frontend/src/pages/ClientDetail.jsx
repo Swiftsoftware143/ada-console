@@ -8,7 +8,7 @@ import {
   DEFAULT_PROFILES,
   DEFAULT_FEATURES,
 } from "@/lib/supabase";
-import { cleanDomain, generateEmbedCode } from "@/lib/helpers";
+import { cleanDomain, generateEmbedCode, getCdnDomain } from "@/lib/helpers";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,12 @@ export default function ClientDetail({ isPersonal = false }) {
   const [tagInput, setTagInput] = useState("");
   const [profileFilter, setProfileFilter] = useState("");
   const [featureFilter, setFeatureFilter] = useState("");
+  const [cdnDomain, setCdnDomain] = useState("https://adaswift.netlify.app");
+
+  const loadCdnDomain = useCallback(async () => {
+    const domain = await getCdnDomain();
+    setCdnDomain(domain);
+  }, []);
 
   const loadTags = useCallback(async () => {
     try {
@@ -97,6 +103,7 @@ export default function ClientDetail({ isPersonal = false }) {
       }
       setClient(hydrate(data));
       loadTags();
+      loadCdnDomain();
       setLoading(false);
     })();
     return () => {
@@ -311,8 +318,8 @@ export default function ClientDetail({ isPersonal = false }) {
   }, [client, id, isPersonal, update]);
 
   const embedCode = useMemo(
-    () => generateEmbedCode(client?.domain),
-    [client?.domain]
+    () => generateEmbedCode(client?.domain, cdnDomain),
+    [client?.domain, cdnDomain]
   );
 
   if (loading || !client) {

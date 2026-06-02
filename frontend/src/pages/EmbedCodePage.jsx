@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, Inbox, ExternalLink, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { generateEmbedCode } from "@/lib/helpers";
+import { generateEmbedCode, getCdnDomain } from "@/lib/helpers";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
@@ -13,6 +13,7 @@ export default function EmbedCodePage() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [cdnDomain, setCdnDomain] = useState("https://adaswift.netlify.app");
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -25,7 +26,13 @@ export default function EmbedCodePage() {
 
   useEffect(() => {
     load();
+    loadCdnDomain();
   }, [load]);
+
+  const loadCdnDomain = async () => {
+    const domain = await getCdnDomain();
+    setCdnDomain(domain);
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -99,7 +106,7 @@ export default function EmbedCodePage() {
               </div>
               <StatusBadge active={c.active} testId={`embed-status-${c.id}`} />
             </div>
-            <EmbedCodeBlock code={generateEmbedCode(c.domain)} testId={`embed-block-${c.id}`} />
+            <EmbedCodeBlock code={generateEmbedCode(c.domain, cdnDomain)} testId={`embed-block-${c.id}`} />
           </div>
         ))}
       </div>

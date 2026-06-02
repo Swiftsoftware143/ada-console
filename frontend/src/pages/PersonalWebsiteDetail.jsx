@@ -8,7 +8,7 @@ import {
   DEFAULT_PROFILES,
   DEFAULT_FEATURES,
 } from "@/lib/supabase";
-import { cleanDomain, generateEmbedCode } from "@/lib/helpers";
+import { cleanDomain, generateEmbedCode, getCdnDomain } from "@/lib/helpers";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,12 @@ export default function PersonalWebsiteDetail() {
   const [tagInput, setTagInput] = useState("");
   const [profileFilter, setProfileFilter] = useState("");
   const [featureFilter, setFeatureFilter] = useState("");
+  const [cdnDomain, setCdnDomain] = useState("https://adaswift.netlify.app");
+
+  const loadCdnDomain = useCallback(async () => {
+    const domain = await getCdnDomain();
+    setCdnDomain(domain);
+  }, []);
 
   const loadTags = useCallback(async () => {
     try {
@@ -97,6 +103,7 @@ export default function PersonalWebsiteDetail() {
       }
       setWebsite(hydrate(data));
       loadTags();
+      loadCdnDomain();
       setLoading(false);
     })();
     return () => {
@@ -293,8 +300,8 @@ export default function PersonalWebsiteDetail() {
   }, [website, id, update]);
 
   const embedCode = useMemo(
-    () => generateEmbedCode(website?.domain),
-    [website?.domain]
+    () => generateEmbedCode(website?.domain, cdnDomain),
+    [website?.domain, cdnDomain]
   );
 
   if (loading || !website) {
