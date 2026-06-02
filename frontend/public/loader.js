@@ -469,14 +469,6 @@
       <strong>${planTier.charAt(0).toUpperCase() + planTier.slice(1)} Plan</strong> — ${pageCount} pages detected
     </div>
     <div class="aw-pane active" id="pane-profiles">
-      <div class="aw-section-label">Quick Actions</div>
-      <button class="aw-profile-btn" id="aw-activate-all" style="background:linear-gradient(135deg,#007bff20,#007bff10);border-color:#007bff">
-        <span class="icon">✨</span>
-        <div class="info">
-          <strong>Activate All Profiles</strong>
-          <span>Enable all accessibility features at once</span>
-        </div>
-      </button>
       <div class="aw-section-label">Accessibility Profiles</div>
       <div class="aw-profiles">
         ${visibleProfiles.map(p => `
@@ -611,46 +603,6 @@
         btn.classList.toggle("active", S[p]);
         applyProfile(p, S[p]);
       });
-    });
-
-    // Activate All Profiles button
-    shadow.getElementById("aw-activate-all").addEventListener("click", () => {
-      const allProfiles = ['epilepsy', 'cognitive', 'adhd', 'blindness', 'visImpaired'];
-      const allFeatures = ['readableFont', 'dyslexia', 'highlightTitles', 'highlightLinks', 'stopAnimations', 'muteSounds'];
-      
-      // Activate all profiles
-      allProfiles.forEach(p => {
-        S[p] = true;
-        const btn = shadow.querySelector(`[data-profile="${p}"]`);
-        if (btn) btn.classList.add("active");
-        applyProfile(p, true);
-      });
-      
-      // Activate key features
-      allFeatures.forEach(f => {
-        S[f] = true;
-        const btn = shadow.querySelector(`[data-feat="${f}"]`);
-        if (btn) btn.classList.add("active");
-        applyFeature(f, true);
-      });
-      
-      // Set high contrast
-      S.contrast = 'high';
-      shadow.querySelectorAll("[data-contrast]").forEach(b => {
-        b.classList.toggle("active", b.dataset.contrast === 'high');
-      });
-      applyContrast('high');
-      
-      // Increase font size
-      S.fontSize = 120;
-      const fsSlider = shadow.getElementById("rng-fs");
-      if (fsSlider) {
-        fsSlider.value = 120;
-        shadow.getElementById("val-fs").textContent = "120%";
-      }
-      applyFontSize(120);
-      
-      console.log('[ADA] All profiles activated');
     });
 
     // Feature buttons

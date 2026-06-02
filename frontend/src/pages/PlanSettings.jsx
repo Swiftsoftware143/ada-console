@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { Save, RefreshCw, Info } from "lucide-react";
+import { Save, RefreshCw, Info, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
@@ -15,37 +16,59 @@ const defaultThresholds = {
   growth_max: 500,
 };
 
-const planFeatures = {
-  basic: { pages: 5, features: "Basic accessibility features", price: "$0" },
-  starter: { pages: 25, features: "Standard features", price: "$47/mo" },
-  pro: { pages: 100, features: "Advanced features", price: "$97/mo" },
-  growth: { pages: 500, features: "Full features", price: "$297/mo" },
-  enterprise: { pages: "Unlimited", features: "Unlimited everything", price: "Custom" },
+const defaultFeatures = {
+  basic: { profiles: true, content: true, display: true, virtualKeyboard: false },
+  starter: { profiles: true, content: true, display: true, virtualKeyboard: false },
+  pro: { profiles: true, content: true, display: true, virtualKeyboard: true },
+  growth: { profiles: true, content: true, display: true, virtualKeyboard: true },
+  enterprise: { profiles: true, content: true, display: true, virtualKeyboard: true },
+};
+
+const planPricing = {
+  basic: "$0",
+  starter: "$47/mo",
+  pro: "$97/mo",
+  growth: "$297/mo",
+  enterprise: "Custom",
 };
 
 export default function PlanSettings() {
   const [thresholds, setThresholds] = useState(defaultThresholds);
+  const [features, setFeatures] = useState(defaultFeatures);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadThresholds();
+    loadSettings();
   }, []);
 
-  const loadThresholds = async () => {
+  const loadSettings = async () => {
     try {
-      const { data, error } = await supabase
+      // Load thresholds
+      const { data: thresholdsData } = await supabase
         .from("settings")
         .select("value")
         .eq("key", "plan_thresholds")
         .maybeSingle();
 
-      if (data?.value) {
-        const parsed = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+      if (thresholdsData?.value) {
+        const parsed = typeof thresholdsData.value === "string" ? JSON.parse(thresholdsData.value) : thresholdsData.value;
         setThresholds({ ...defaultThresholds, ...parsed });
       }
+
+      // Load features
+      const { data: featuresData } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "plan_features")
+        .maybeSingle();
+
+      if (featuresData?.value) {
+        const parsed = typeof featuresData.value === "string" ? JSON.parse(featuresData.value) : featuresData.value;
+        setFeatures({ ...defaultFeatures, ...parsed });
+      }
     } catch (e) {
-      console.error("Error loading thresholds:", e);
+      console.error("Error loading settings:", e);
     } finally {
       setLoading(false);
     }
@@ -62,7 +85,8 @@ export default function PlanSettings() {
         return;
       }
 
-      const { error } = await supabase
+      // Save thresholds
+      const { error: thresholdsError } = await supabase
         .from("settings")
         .upsert(
           {
@@ -73,11 +97,25 @@ export default function PlanSettings() {
           { onConflict: "key" }
         );
 
-      if (error) throw error;
+      if (thresholdsError) throw thresholdsError;
 
-      toast.success("Plan thresholds saved successfully");
+      // Save features
+      const { error: featuresError } = await supabase
+        .from("settings")
+        .upsert(
+          {
+            key: "plan_features",
+            value: JSON.stringify(features),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "key" }
+        );
+
+      if (featuresError) throw featuresError;
+
+      toast.success("Plan settings saved successfully");
     } catch (e) {
-      toast.error("Failed to save thresholds: " + e.message);
+      toast.error("Failed to save settings: " + e.message);
     } finally {
       setSaving(false);
     }
@@ -85,7 +123,18 @@ export default function PlanSettings() {
 
   const handleReset = () => {
     setThresholds(defaultThresholds);
+    setFeatures(defaultFeatures);
     toast.info("Reset to default values. Click Save to apply.");
+  };
+
+  const updateFeature = (plan, feature, enabled) => {
+    setFeatures(prev => ({
+      ...prev,
+      [plan]: {
+        ...prev[plan],
+        [feature]: enabled
+      }
+    }));
   };
 
   if (loading) {
@@ -99,19 +148,19 @@ export default function PlanSettings() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto bg-[#0f1117] min-h-screen">
+    <div className="p-6 max-w-6xl mx-auto bg-[#0f1117] min-h-screen">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Plan Settings</h1>
         <p className="text-[#94a3b8] mt-1">
-          Configure automatic plan assignment based on website page count
+          Configure automatic plan assignment and feature availability
         </p>
       </div>
 
       <Alert className="mb-6 bg-[#1e2130] border-[#2e3245] text-[#94a3b8]">
         <Info className="h-4 w-4 text-[#007bff]" />
         <AlertDescription className="text-[#94a3b8]">
-          The widget automatically detects the number of pages on a website and assigns 
-          the appropriate plan tier. Adjust the thresholds below to control plan assignment.
+          The widget detects page count and assigns plans automatically. Control which features 
+          are available for each plan tier below.
         </AlertDescription>
       </Alert>
 
@@ -125,109 +174,144 @@ export default function PlanSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="basic_max" className="text-[#94a3b8]">Basic Plan - Max Pages</Label>
-                <Input
-                  id="basic_max"
-                  type="number"
-                  min="1"
-                  value={thresholds.basic_max}
-                  onChange={(e) =>
-                    setThresholds({ ...thresholds, basic_max: parseInt(e.target.value) || 0 })
-                  }
-                  className="bg-[#0f1117] border-[#2e3245] text-white"
-                />
-                <p className="text-sm text-[#64748b]">
-                  1-{thresholds.basic_max} pages
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="starter_max" className="text-[#94a3b8]">Starter Plan - Max Pages</Label>
-                <Input
-                  id="starter_max"
-                  type="number"
-                  min={thresholds.basic_max + 1}
-                  value={thresholds.starter_max}
-                  onChange={(e) =>
-                    setThresholds({ ...thresholds, starter_max: parseInt(e.target.value) || 0 })
-                  }
-                  className="bg-[#0f1117] border-[#2e3245] text-white"
-                />
-                <p className="text-sm text-[#64748b]">
-                  {thresholds.basic_max + 1}-{thresholds.starter_max} pages
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="pro_max" className="text-[#94a3b8]">Pro Plan - Max Pages</Label>
-                <Input
-                  id="pro_max"
-                  type="number"
-                  min={thresholds.starter_max + 1}
-                  value={thresholds.pro_max}
-                  onChange={(e) =>
-                    setThresholds({ ...thresholds, pro_max: parseInt(e.target.value) || 0 })
-                  }
-                  className="bg-[#0f1117] border-[#2e3245] text-white"
-                />
-                <p className="text-sm text-[#64748b]">
-                  {thresholds.starter_max + 1}-{thresholds.pro_max} pages
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="growth_max" className="text-[#94a3b8]">Growth Plan - Max Pages</Label>
-                <Input
-                  id="growth_max"
-                  type="number"
-                  min={thresholds.pro_max + 1}
-                  value={thresholds.growth_max}
-                  onChange={(e) =>
-                    setThresholds({ ...thresholds, growth_max: parseInt(e.target.value) || 0 })
-                  }
-                  className="bg-[#0f1117] border-[#2e3245] text-white"
-                />
-                <p className="text-sm text-[#64748b]">
-                  {thresholds.pro_max + 1}-{thresholds.growth_max} pages
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-[#2e3245]">
-              <p className="text-sm text-[#94a3b8]">
-                <strong className="text-white">Enterprise:</strong> {thresholds.growth_max + 1}+ pages
-              </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              {[
+                { key: 'basic_max', label: 'Basic', pages: `1-${thresholds.basic_max}` },
+                { key: 'starter_max', label: 'Starter', pages: `${thresholds.basic_max + 1}-${thresholds.starter_max}` },
+                { key: 'pro_max', label: 'Pro', pages: `${thresholds.starter_max + 1}-${thresholds.pro_max}` },
+                { key: 'growth_max', label: 'Growth', pages: `${thresholds.pro_max + 1}-${thresholds.growth_max}` },
+                { key: 'enterprise', label: 'Enterprise', pages: `${thresholds.growth_max + 1}+` },
+              ].map((plan) => (
+                <div key={plan.key} className="space-y-2">
+                  <Label className="text-[#94a3b8]">{plan.label}</Label>
+                  {plan.key !== 'enterprise' ? (
+                    <Input
+                      type="number"
+                      min="1"
+                      value={thresholds[plan.key]}
+                      onChange={(e) =>
+                        setThresholds({ ...thresholds, [plan.key]: parseInt(e.target.value) || 0 })
+                      }
+                      className="bg-[#0f1117] border-[#2e3245] text-white"
+                    />
+                  ) : (
+                    <div className="h-10 flex items-center text-[#64748b]">Unlimited</div>
+                  )}
+                  <p className="text-sm text-[#64748b]">{plan.pages} pages</p>
+                  <p className="text-sm text-[#007bff] font-medium">{planPricing[plan.key.replace('_max', '')]}</p>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* Plan Features Overview */}
+        {/* Feature Controls */}
         <Card className="bg-[#1e2130] border-[#2e3245]">
           <CardHeader>
-            <CardTitle className="text-white">Plan Features</CardTitle>
+            <CardTitle className="text-white">Feature Availability by Plan</CardTitle>
             <CardDescription className="text-[#94a3b8]">
-              Overview of features available in each plan tier
+              Control which widget features are available for each plan tier
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(planFeatures).map(([plan, details]) => (
-                <div
-                  key={plan}
-                  className="p-4 rounded-lg border border-[#2e3245] bg-[#0f1117]"
-                >
-                  <h3 className="font-semibold text-white capitalize mb-2">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              {Object.entries(features).map(([plan, planFeatures]) => (
+                <div key={plan} className="space-y-4">
+                  <h3 className="font-semibold text-white capitalize text-center pb-2 border-b border-[#2e3245]">
                     {plan}
                   </h3>
-                  <div className="space-y-1 text-sm">
-                    <p className="text-[#94a3b8]">{details.price}</p>
-                    <p className="text-[#94a3b8]">Up to {details.pages} pages</p>
-                    <p className="text-[#64748b]">{details.features}</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`${plan}-profiles`}
+                        checked={planFeatures.profiles}
+                        onCheckedChange={(checked) => updateFeature(plan, 'profiles', checked)}
+                        className="border-[#2e3245]"
+                      />
+                      <Label htmlFor={`${plan}-profiles`} className="text-[#94a3b8] text-sm">
+                        Accessibility Profiles
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`${plan}-content`}
+                        checked={planFeatures.content}
+                        onCheckedChange={(checked) => updateFeature(plan, 'content', checked)}
+                        className="border-[#2e3245]"
+                      />
+                      <Label htmlFor={`${plan}-content`} className="text-[#94a3b8] text-sm">
+                        Content Adjustments
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`${plan}-display`}
+                        checked={planFeatures.display}
+                        onCheckedChange={(checked) => updateFeature(plan, 'display', checked)}
+                        className="border-[#2e3245]"
+                      />
+                      <Label htmlFor={`${plan}-display`} className="text-[#94a3b8] text-sm">
+                        Display & Colors
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`${plan}-virtualKeyboard`}
+                        checked={planFeatures.virtualKeyboard}
+                        onCheckedChange={(checked) => updateFeature(plan, 'virtualKeyboard', checked)}
+                        className="border-[#2e3245]"
+                      />
+                      <Label htmlFor={`${plan}-virtualKeyboard`} className="text-[#94a3b8] text-sm">
+                        Virtual Keyboard
+                      </Label>
+                    </div>
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Summary */}
+        <Card className="bg-[#1e2130] border-[#2e3245]">
+          <CardHeader>
+            <CardTitle className="text-white">Plan Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#2e3245]">
+                    <th className="text-left py-2 text-[#94a3b8]">Plan</th>
+                    <th className="text-left py-2 text-[#94a3b8]">Pages</th>
+                    <th className="text-left py-2 text-[#94a3b8]">Price</th>
+                    <th className="text-left py-2 text-[#94a3b8]">Features</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { name: 'Basic', pages: `1-${thresholds.basic_max}`, price: planPricing.basic, features: features.basic },
+                    { name: 'Starter', pages: `${thresholds.basic_max + 1}-${thresholds.starter_max}`, price: planPricing.starter, features: features.starter },
+                    { name: 'Pro', pages: `${thresholds.starter_max + 1}-${thresholds.pro_max}`, price: planPricing.pro, features: features.pro },
+                    { name: 'Growth', pages: `${thresholds.pro_max + 1}-${thresholds.growth_max}`, price: planPricing.growth, features: features.growth },
+                    { name: 'Enterprise', pages: `${thresholds.growth_max + 1}+`, price: planPricing.enterprise, features: features.enterprise },
+                  ].map((plan) => (
+                    <tr key={plan.name} className="border-b border-[#2e3245]">
+                      <td className="py-3 text-white font-medium">{plan.name}</td>
+                      <td className="py-3 text-[#94a3b8]">{plan.pages}</td>
+                      <td className="py-3 text-[#007bff]">{plan.price}</td>
+                      <td className="py-3">
+                        <div className="flex gap-2">
+                          {plan.features.profiles && <span className="text-xs bg-[#007bff20] text-[#007bff] px-2 py-1 rounded">Profiles</span>}
+                          {plan.features.content && <span className="text-xs bg-[#007bff20] text-[#007bff] px-2 py-1 rounded">Content</span>}
+                          {plan.features.display && <span className="text-xs bg-[#007bff20] text-[#007bff] px-2 py-1 rounded">Display</span>}
+                          {plan.features.virtualKeyboard && <span className="text-xs bg-[#007bff20] text-[#007bff] px-2 py-1 rounded">Keyboard</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>
@@ -254,7 +338,7 @@ export default function PlanSettings() {
               </>
             ) : (
               <>
-                <Save className="w-4 h-4" />
+                <Check className="w-4 h-4" />
                 Save Settings
               </>
             )}
