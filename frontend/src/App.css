@@ -3,6 +3,22 @@
   background-color: #0f1117;
 }
 
+/* Logo with transparent background */
+.logo-transparent {
+  background: transparent !important;
+  mix-blend-mode: screen;
+  filter: brightness(1.1) contrast(1.1);
+}
+
+.logo-container {
+  background: transparent !important;
+}
+
+.logo-container img {
+  background: transparent !important;
+  mix-blend-mode: screen;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 10px;

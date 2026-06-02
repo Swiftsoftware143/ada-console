@@ -23,10 +23,12 @@ export default function Sidebar() {
       className="hidden md:flex fixed inset-y-0 left-0 z-30 w-64 flex-col bg-[#1a1d27] border-r border-[#2e3245]"
     >
       <div className="px-6 py-7 border-b border-[#2e3245]">
-        <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-red-500 to-red-600 grid place-items-center shadow-lg shadow-red-500/20">
-            <Zap className="h-5 w-5 text-white" strokeWidth={2.5} />
-          </div>
+        <div className="flex items-center gap-2.5 logo-container">
+          <img 
+            src="/logo.jpg" 
+            alt="ADASwift" 
+            className="h-9 w-9 rounded-lg object-cover logo-transparent"
+          />
           <div className="leading-tight">
             <div
               className="font-black text-white tracking-tight text-[15px]"
