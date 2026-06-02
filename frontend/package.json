@@ -59,6 +59,7 @@
     "zod": "^3.24.4"
   },
   "scripts": {
+    "prebuild": "rm -rf node_modules package-lock.json && npm install",
     "start": "craco start",
     "build": "craco build",
     "build:analyze": "npm run build && npx source-map-explorer 'build/static/js/*.js'",
