@@ -1,12 +1,13 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { LayoutDashboard, Users, Code2, Zap, Settings, Globe, Puzzle, LogOut, User, Layers } from "lucide-react";
+import { LayoutDashboard, Users, Code2, Zap, Settings, Globe, Puzzle, LogOut, User, Layers, Workflow } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, testId: "nav-dashboard" },
   { to: "/clients", label: "Clients", icon: Users, testId: "nav-clients" },
   { to: "/personal-websites", label: "Personal Websites", icon: Globe, testId: "nav-personal-websites" },
   { to: "/widget-requests", label: "Widget Requests", icon: Puzzle, testId: "nav-widget-requests" },
+  { to: "/automation", label: "Automation", icon: Workflow, testId: "nav-automation" },
   { to: "/embed", label: "Embed Code", icon: Code2, testId: "nav-embed" },
   { to: "/plan-settings", label: "Plan Settings", icon: Layers, testId: "nav-plan-settings" },
   { to: "/settings", label: "Settings", icon: Settings, testId: "nav-settings" },

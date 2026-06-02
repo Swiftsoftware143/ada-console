@@ -17,6 +17,7 @@ const PersonalWebsiteDetail = lazy(() => import("@/pages/PersonalWebsiteDetail")
 const WidgetRequests = lazy(() => import("@/pages/WidgetRequests"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const PlanSettings = lazy(() => import("@/pages/PlanSettings"));
+const AutomationDashboard = lazy(() => import("@/pages/AutomationDashboard"));
 
 // Loading component
 const PageLoader = () => (
@@ -54,6 +55,7 @@ function App() {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/plan-settings" element={<PlanSettings />} />
+<Route path="/automation" element={<AutomationDashboard />} />
               </Route>
               
               {/* Redirect unknown routes to login */}
