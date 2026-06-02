@@ -346,7 +346,9 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
               </SelectTrigger>
               <SelectContent className="bg-[#1e2130] border-[#2e3245] text-white">
                 <SelectItem value="basic">Basic</SelectItem>
+                <SelectItem value="starter">Starter</SelectItem>
                 <SelectItem value="pro">Pro</SelectItem>
+                <SelectItem value="growth">Growth</SelectItem>
                 <SelectItem value="enterprise">Enterprise</SelectItem>
               </SelectContent>
             </Select>
