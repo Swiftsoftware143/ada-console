@@ -37,11 +37,14 @@ exports.handler = async (event, context) => {
     console.log('Groove IPN received:', data);
 
     // Extract data from GrooveSell IPN
-    // GrooveSell field names - adjust based on your actual field mappings
+    // Your exact form field names: first_name, last_name, email, phone_number, Company, website URL
     const contactEmail = data.email || data.customer_email || data.buyer_email;
-    const contactName = data.customer_name || data.buyer_name || data.name || '';
-    const businessName = data.business_name || data.company || contactName;
-    const domain = data.website || data.domain || data.website_url || data.custom_website;
+    const firstName = data.first_name || '';
+    const lastName = data.last_name || '';
+    const contactName = `${firstName} ${lastName}`.trim() || data.customer_name || data.buyer_name || data.name || '';
+    const phoneNumber = data.phone_number || data.phone || '';
+    const companyName = data.Company || data.company || data.business_name || contactName;
+    const domain = data['website URL'] || data.website || data.domain || data.website_url || data.custom_website;
     const productName = data.product_name || data.plan_tier || 'starter';
     const transactionId = data.transaction_id || data.order_id || data.id;
 
@@ -113,7 +116,7 @@ exports.handler = async (event, context) => {
         trigger_id: transactionId,
         contact_email: contactEmail.toLowerCase().trim(),
         contact_name: contactName || contactEmail.split('@')[0],
-        business_name: businessName || contactName || 'Unknown Business',
+        business_name: companyName || contactName || 'Unknown Business',
         domain: cleanDomain,
         plan_tier: planTier || 'starter',
         email_status: automationEnabled ? 'pending' : 'paused'
@@ -150,10 +153,11 @@ exports.handler = async (event, context) => {
       const { data: newClient, error: createError } = await supabase
         .from('clients')
         .insert({
-          name: businessName || contactName || 'Unknown Business',
+          name: companyName || contactName || 'Unknown Business',
           domain: cleanDomain,
           contact_email: contactEmail,
           contact_name: contactName || contactEmail.split('@')[0],
+          contact_phone: phoneNumber,
           plan_tier: planTier || 'starter',
           active: true,
           agency_name: 'SwiftImpact Solutions',
@@ -211,7 +215,10 @@ exports.handler = async (event, context) => {
     // Replace placeholders
     const emailHtml = emailTemplate.htmlBody
       .replace(/\{\{contact_name\}\}/g, contactName || contactEmail.split('@')[0])
-      .replace(/\{\{business_name\}\}/g, businessName || contactName || 'Your Business')
+      .replace(/\{\{first_name\}\}/g, firstName || contactName.split(' ')[0] || 'There')
+      .replace(/\{\{last_name\}\}/g, lastName || '')
+      .replace(/\{\{business_name\}\}/g, companyName || contactName || 'Your Business')
+      .replace(/\{\{company_name\}\}/g, companyName || contactName || 'Your Business')
       .replace(/\{\{domain\}\}/g, cleanDomain)
       .replace(/\{\{plan_tier\}\}/g, planTier)
       .replace(/\{\{billing_period\}\}/g, billingPeriod)
@@ -413,6 +420,9 @@ const defaultEmailTemplate = `<!DOCTYPE html>
       
       <h3>📊 Your Plan</h3>
       <p><strong>{{plan_tier}}</strong> - {{billing_period}} Billing</p>
+      
+      <h3>🏢 Company</h3>
+      <p><strong>{{company_name}}</strong></p>
       
       <h3>Need Help?</h3>
       <p>Reply to this email or contact us at support@swiftimpactsolutions.com</p>

@@ -109,7 +109,9 @@ export default function AutomationDashboard() {
   });
   const [previewData, setPreviewData] = useState({
     contact_name: "John Doe",
-    business_name: "Acme Inc",
+    first_name: "John",
+    last_name: "Doe",
+    company_name: "Acme Inc",
     domain: "acme.com",
     plan_tier: "Pro",
     billing_period: "Monthly",
@@ -577,7 +579,9 @@ export default function AutomationDashboard() {
                       dangerouslySetInnerHTML={{ 
                         __html: emailTemplate.htmlBody
                           .replace(/\{\{contact_name\}\}/g, previewData.contact_name)
-                          .replace(/\{\{business_name\}\}/g, previewData.business_name)
+                          .replace(/\{\{first_name\}\}/g, previewData.first_name)
+                          .replace(/\{\{last_name\}\}/g, previewData.last_name)
+                          .replace(/\{\{company_name\}\}/g, previewData.company_name)
                           .replace(/\{\{domain\}\}/g, previewData.domain)
                           .replace(/\{\{plan_tier\}\}/g, previewData.plan_tier)
                           .replace(/\{\{billing_period\}\}/g, previewData.billing_period)
@@ -595,9 +599,9 @@ export default function AutomationDashboard() {
                         className="bg-[#1e2130] border-[#2e3245] text-white text-sm"
                       />
                       <Input
-                        value={previewData.business_name}
-                        onChange={(e) => setPreviewData({ ...previewData, business_name: e.target.value })}
-                        placeholder="Business Name"
+                        value={previewData.company_name}
+                        onChange={(e) => setPreviewData({ ...previewData, company_name: e.target.value })}
+                        placeholder="Company Name"
                         className="bg-[#1e2130] border-[#2e3245] text-white text-sm"
                       />
                     </div>
@@ -613,11 +617,15 @@ export default function AutomationDashboard() {
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center justify-between p-2 bg-[#1e2130] rounded">
                         <code className="text-[#007bff]">{"{{contact_name}}"}</code>
-                        <span className="text-[#64748b]">Client's name</span>
+                        <span className="text-[#64748b]">Full name</span>
                       </div>
                       <div className="flex items-center justify-between p-2 bg-[#1e2130] rounded">
-                        <code className="text-[#007bff]">{"{{business_name}}"}</code>
-                        <span className="text-[#64748b]">Business name</span>
+                        <code className="text-[#007bff]">{"{{first_name}}"}</code>
+                        <span className="text-[#64748b]">First name only</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 bg-[#1e2130] rounded">
+                        <code className="text-[#007bff]">{"{{company_name}}"}</code>
+                        <span className="text-[#64748b]">Company name</span>
                       </div>
                       <div className="flex items-center justify-between p-2 bg-[#1e2130] rounded">
                         <code className="text-[#007bff]">{"{{domain}}"}</code>
