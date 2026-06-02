@@ -9,7 +9,11 @@
   const CURRENT_DOMAIN   = (document.currentScript && document.currentScript.getAttribute("data-domain"))
                            || window.location.hostname.replace(/^www\./, "");
   
+  // Extract root domain for subdomain matching (e.g., "sub.example.com" -> "example.com")
+  const ROOT_DOMAIN = CURRENT_DOMAIN.split('.').slice(-2).join('.');
+  
   console.log('[ADA] Domain detected:', CURRENT_DOMAIN);
+  console.log('[ADA] Root domain:', ROOT_DOMAIN);
   /* ─────────────────────────────────────────────────────────────────────── */
 
   if (!CURRENT_DOMAIN) {
@@ -18,8 +22,11 @@
   }
 
   /* ── FETCH CLIENT CONFIG FROM SUPABASE ─────────────────────────────────── */
-  // Try clients table first, then personal_websites
-  fetch(`${SUPABASE_URL}/rest/v1/clients?domain=eq.${encodeURIComponent(CURRENT_DOMAIN)}&select=*&limit=1`, {
+  // Try exact domain match first, then root domain match (for subdomains)
+  // This allows one widget config to work on main domain + all subdomains
+  const domainFilter = `domain=eq.${encodeURIComponent(CURRENT_DOMAIN)},domain=eq.${encodeURIComponent(ROOT_DOMAIN)}`;
+  
+  fetch(`${SUPABASE_URL}/rest/v1/clients?or=(${domainFilter})&select=*&limit=1`, {
     headers: {
       "apikey":        SUPABASE_ANON,
       "Authorization": `Bearer ${SUPABASE_ANON}`,
@@ -33,8 +40,8 @@
       if (!client.active) return;        /* Widget is off — do nothing */
       injectWidget(client);
     } else {
-      // Try personal_websites table
-      return fetch(`${SUPABASE_URL}/rest/v1/personal_websites?domain=eq.${encodeURIComponent(CURRENT_DOMAIN)}&select=*&limit=1`, {
+      // Try personal_websites table with same subdomain logic
+      return fetch(`${SUPABASE_URL}/rest/v1/personal_websites?or=(${domainFilter})&select=*&limit=1`, {
         headers: {
           "apikey":        SUPABASE_ANON,
           "Authorization": `Bearer ${SUPABASE_ANON}`,
