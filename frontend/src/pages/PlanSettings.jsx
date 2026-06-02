@@ -16,11 +16,11 @@ const defaultThresholds = {
 };
 
 const planFeatures = {
-  basic: { profiles: 3, features: "Basic accessibility features", price: "$0" },
-  starter: { profiles: 5, features: "Standard features", price: "$47/mo" },
-  pro: { profiles: 8, features: "Advanced features", price: "$97/mo" },
-  growth: { profiles: 10, features: "Full features", price: "$297/mo" },
-  enterprise: { profiles: 999, features: "Unlimited everything", price: "Custom" },
+  basic: { pages: 5, features: "Basic accessibility features", price: "$0" },
+  starter: { pages: 25, features: "Standard features", price: "$47/mo" },
+  pro: { pages: 100, features: "Advanced features", price: "$97/mo" },
+  growth: { pages: 500, features: "Full features", price: "$297/mo" },
+  enterprise: { pages: "Unlimited", features: "Unlimited everything", price: "Custom" },
 };
 
 export default function PlanSettings() {
@@ -223,7 +223,7 @@ export default function PlanSettings() {
                   </h3>
                   <div className="space-y-1 text-sm">
                     <p className="text-[#94a3b8]">{details.price}</p>
-                    <p className="text-[#94a3b8]">{details.profiles} profiles</p>
+                    <p className="text-[#94a3b8]">Up to {details.pages} pages</p>
                     <p className="text-[#64748b]">{details.features}</p>
                   </div>
                 </div>

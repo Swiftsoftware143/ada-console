@@ -59,11 +59,13 @@
   function determinePlan(pageCount, planSettings) {
     const settings = planSettings || {
       basic_max: 5,
-      pro_max: 25,
-      growth_max: 100
+      starter_max: 25,
+      pro_max: 100,
+      growth_max: 500
     };
     
     if (pageCount <= settings.basic_max) return 'basic';
+    if (pageCount <= settings.starter_max) return 'starter';
     if (pageCount <= settings.pro_max) return 'pro';
     if (pageCount <= settings.growth_max) return 'growth';
     return 'enterprise';
@@ -183,17 +185,8 @@
     const FEATURES = cfg.enabled_features || {};
     const NS       = "si";
 
-    // Plan-based feature limits
-    const PLAN_LIMITS = {
-      'basic': { profiles: 3, features: 'basic' },
-      'starter': { profiles: 5, features: 'standard' },
-      'pro': { profiles: 8, features: 'advanced' },
-      'growth': { profiles: 10, features: 'full' },
-      'enterprise': { profiles: 999, features: 'unlimited' }
-    };
-    
-    const limits = PLAN_LIMITS[planTier] || PLAN_LIMITS['basic'];
-    console.log('[ADA] Plan limits:', limits);
+    // All plans get full features - pricing is based on page count only
+    console.log('[ADA] Plan tier:', planTier, 'Pages:', pageCount);
 
     if (document.getElementById(`${NS}-aw-host`)) return;
 
@@ -318,10 +311,6 @@
       .aw-btn .bicon { font-size:20px; }
       .aw-btn:hover { border-color:${COLOR}; background:#eef5ff; color:${COLOR}; }
       .aw-btn.active { border-color:${COLOR}; background:#ddeeff; color:${COLOR}; }
-      .aw-btn.aw-locked { opacity:0.5; cursor:not-allowed; position:relative; }
-      .aw-btn.aw-locked::after {
-        content:'🔒'; position:absolute; top:2px; right:2px; font-size:10px;
-      }
       .aw-slider-row { margin-bottom:10px; }
       .aw-slider-row label {
         display:flex; justify-content:space-between; align-items:center;
@@ -412,16 +401,14 @@
     const CLOSE_IC = `<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>`;
     const ACCESS_IC = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="4" r="2.5" fill="white"/><path d="M19 13v-2h-5.5l-.8-2.5c-.3-.8-1-1.3-1.8-1.3H9c-.8 0-1.5.5-1.8 1.2L5.5 13H3v2h3.5l1.7-5.2c.1-.3.4-.5.7-.5h1.5l.8 2.5c.3.8 1 1.3 1.8 1.3H19v5h-3v2h3c1.1 0 2-.9 2-2v-5c0-1.1-.9-2-2-2z" fill="white"/><path d="M7 17.5c0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5-2-4.5-4.5-4.5S7 15 7 17.5zm7 0c0 1.4-1.1 2.5-2.5 2.5S9 18.9 9 17.5s1.1-2.5 2.5-2.5 2.5 1.1 2.5 2.5z" fill="white"/></svg>`;
 
-    // Build profiles based on plan limits
-    const allProfiles = [
-      { id: 'epilepsy', icon: '⚡', name: 'Epilepsy Safe', desc: 'Stops animations & flashing', locked: false },
-      { id: 'cognitive', icon: '🧠', name: 'Cognitive', desc: 'Simplified interface', locked: false },
-      { id: 'adhd', icon: '🎯', name: 'ADHD Friendly', desc: 'Focus mode', locked: false },
-      { id: 'blindness', icon: '👁️', name: 'Blindness', desc: 'Screen reader optimized', locked: limits.profiles < 4 },
-      { id: 'visImpaired', icon: '👓', name: 'Visually Impaired', desc: 'Enhanced contrast', locked: limits.profiles < 5 },
+    // All profiles available for all plans - pricing based on page count only
+    const visibleProfiles = [
+      { id: 'epilepsy', icon: '⚡', name: 'Epilepsy Safe', desc: 'Stops animations & flashing' },
+      { id: 'cognitive', icon: '🧠', name: 'Cognitive', desc: 'Simplified interface' },
+      { id: 'adhd', icon: '🎯', name: 'ADHD Friendly', desc: 'Focus mode' },
+      { id: 'blindness', icon: '👁️', name: 'Blindness', desc: 'Screen reader optimized' },
+      { id: 'visImpaired', icon: '👓', name: 'Visually Impaired', desc: 'Enhanced contrast' },
     ];
-    
-    const visibleProfiles = allProfiles.slice(0, limits.profiles);
 
     const tmpl = document.createElement("template");
     tmpl.innerHTML = `
@@ -478,21 +465,18 @@
     <button class="aw-tab" data-tab="display">Display</button>
   </div>
   <div id="aw-body">
-    ${limits.features !== 'unlimited' ? `
     <div class="aw-upgrade-banner">
-      <strong>${planTier} Plan</strong> — ${pageCount} pages detected. 
-      ${limits.features === 'basic' ? 'Upgrade for more features!' : 'Upgrade for unlimited access!'}
+      <strong>${planTier.charAt(0).toUpperCase() + planTier.slice(1)} Plan</strong> — ${pageCount} pages detected
     </div>
-    ` : ''}
     <div class="aw-pane active" id="pane-profiles">
       <div class="aw-section-label">Accessibility Profiles</div>
       <div class="aw-profiles">
         ${visibleProfiles.map(p => `
-          <button class="aw-profile-btn${p.locked ? ' aw-locked' : ''}" data-profile="${p.id}"${p.locked ? ' disabled' : ''}>
+          <button class="aw-profile-btn" data-profile="${p.id}">
             <span class="icon">${p.icon}</span>
             <div class="info">
               <strong>${p.name}</strong>
-              <span>${p.desc}${p.locked ? ' (Upgrade to unlock)' : ''}</span>
+              <span>${p.desc}</span>
             </div>
           </button>
         `).join('')}
@@ -505,10 +489,10 @@
         <button class="aw-btn" data-feat="dyslexia"><span class="bicon">🔠</span>Dyslexia Friendly</button>
         <button class="aw-btn" data-feat="highlightTitles"><span class="bicon">📌</span>Highlight Titles</button>
         <button class="aw-btn" data-feat="highlightLinks"><span class="bicon">🔗</span>Highlight Links</button>
-        <button class="aw-btn${limits.features === 'basic' ? ' aw-locked' : ''}" data-feat="stopAnimations"${limits.features === 'basic' ? ' disabled' : ''}><span class="bicon">⏹️</span>Stop Animations${limits.features === 'basic' ? '<br><small>(Upgrade)</small>' : ''}</button>
-        <button class="aw-btn${limits.features === 'basic' ? ' aw-locked' : ''}" data-feat="muteSounds"${limits.features === 'basic' ? ' disabled' : ''}><span class="bicon">🔇</span>Mute Sounds${limits.features === 'basic' ? '<br><small>(Upgrade)</small>' : ''}</button>
-        <button class="aw-btn${limits.features === 'basic' ? ' aw-locked' : ''}" data-feat="hideImages"${limits.features === 'basic' ? ' disabled' : ''}><span class="bicon">🖼️</span>Hide Images${limits.features === 'basic' ? '<br><small>(Upgrade)</small>' : ''}</button>
-        <button class="aw-btn${limits.features !== 'unlimited' ? ' aw-locked' : ''}" data-feat="virtualKeyboard"${limits.features !== 'unlimited' ? ' disabled' : ''}><span class="bicon">⌨️</span>Virtual Keyboard${limits.features !== 'unlimited' ? '<br><small>(Enterprise)</small>' : ''}</button>
+        <button class="aw-btn" data-feat="stopAnimations"><span class="bicon">⏹️</span>Stop Animations</button>
+        <button class="aw-btn" data-feat="muteSounds"><span class="bicon">🔇</span>Mute Sounds</button>
+        <button class="aw-btn" data-feat="hideImages"><span class="bicon">🖼️</span>Hide Images</button>
+        <button class="aw-btn" data-feat="virtualKeyboard"><span class="bicon">⌨️</span>Virtual Keyboard</button>
       </div>
       <div class="aw-section-label">Text Alignment</div>
       <div class="aw-align-row">
@@ -536,4 +520,308 @@
       <div class="aw-slider-row">
         <label>Letter Spacing <span id="val-ls">0px</span></label>
         <input type="range" id="rng-ls" min="0" max="10" value="0">
-        <div class
+        <div class="aw-slider-btns">
+          <button data-reset="letterSpacing">Reset</button>
+        </div>
+      </div>
+      <div class="aw-section-label">Colors</div>
+      <div class="aw-color-row">
+        <span>Text Color</span>
+        <div>
+          <input type="color" id="col-text" value="#000000">
+          <button data-reset="textColor">Reset</button>
+        </div>
+      </div>
+      <div class="aw-color-row">
+        <span>Title Color</span>
+        <div>
+          <input type="color" id="col-title" value="#000000">
+          <button data-reset="titleColor">Reset</button>
+        </div>
+      </div>
+      <div class="aw-color-row">
+        <span>Background</span>
+        <div>
+          <input type="color" id="col-bg" value="#ffffff">
+          <button data-reset="bgColor">Reset</button>
+        </div>
+      </div>
+      <div class="aw-section-label">Contrast Modes</div>
+      <div class="aw-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <button class="aw-btn" data-contrast="dark"><span class="bicon">🌙</span>Dark</button>
+        <button class="aw-btn" data-contrast="light"><span class="bicon">☀️</span>Light</button>
+        <button class="aw-btn" data-contrast="high"><span class="bicon">🔲</span>High Contrast</button>
+      </div>
+    </div>
+    <div id="aw-footer">
+      <button id="aw-reset">Reset All</button>
+      <div id="aw-powered">Powered by<br><a href="${CTA_URL}" target="_blank">${AGENCY}</a></div>
+    </div>
+  </div>
+</div>
+`;
+
+    shadow.appendChild(tmpl.content.cloneNode(true));
+
+    /* ── INTERACTION HANDLERS ─────────────────────────────────────────────── */
+    const trigger = shadow.getElementById("aw-trigger");
+    const panel   = shadow.getElementById("aw-panel");
+    const close   = shadow.getElementById("aw-close");
+    const tabs    = shadow.querySelectorAll(".aw-tab");
+    const panes   = shadow.querySelectorAll(".aw-pane");
+    const reset   = shadow.getElementById("aw-reset");
+
+    // Toggle panel
+    trigger.addEventListener("click", () => {
+      S.open = !S.open;
+      trigger.setAttribute("aria-expanded", S.open);
+      panel.classList.toggle("aw-hidden", !S.open);
+    });
+
+    // Close panel
+    close.addEventListener("click", () => {
+      S.open = false;
+      trigger.setAttribute("aria-expanded", "false");
+      panel.classList.add("aw-hidden");
+    });
+
+    // Tab switching
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        const t = tab.dataset.tab;
+        S.tab = t;
+        tabs.forEach(x => x.classList.toggle("active", x === tab));
+        panes.forEach(p => p.classList.toggle("active", p.id === `pane-${t}`));
+      });
+    });
+
+    // Profile buttons
+    shadow.querySelectorAll("[data-profile]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const p = btn.dataset.profile;
+        S[p] = !S[p];
+        btn.classList.toggle("active", S[p]);
+        applyProfile(p, S[p]);
+      });
+    });
+
+    // Feature buttons
+    shadow.querySelectorAll("[data-feat]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const f = btn.dataset.feat;
+        S[f] = !S[f];
+        btn.classList.toggle("active", S[f]);
+        applyFeature(f, S[f]);
+      });
+    });
+
+    // Alignment buttons
+    shadow.querySelectorAll("[data-align]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const a = btn.dataset.align;
+        S.textAlign = S.textAlign === a ? null : a;
+        shadow.querySelectorAll("[data-align]").forEach(b => b.classList.toggle("active", b.dataset.align === S.textAlign));
+        applyTextAlign(S.textAlign);
+      });
+    });
+
+    // Contrast buttons
+    shadow.querySelectorAll("[data-contrast]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const c = btn.dataset.contrast;
+        S.contrast = S.contrast === c ? null : c;
+        shadow.querySelectorAll("[data-contrast]").forEach(b => b.classList.toggle("active", b.dataset.contrast === S.contrast));
+        applyContrast(S.contrast);
+      });
+    });
+
+    // Sliders
+    const fsSlider = shadow.getElementById("rng-fs");
+    const lhSlider = shadow.getElementById("rng-lh");
+    const lsSlider = shadow.getElementById("rng-ls");
+
+    fsSlider.addEventListener("input", (e) => {
+      S.fontSize = parseInt(e.target.value);
+      shadow.getElementById("val-fs").textContent = S.fontSize + "%";
+      applyFontSize(S.fontSize);
+    });
+
+    lhSlider.addEventListener("input", (e) => {
+      S.lineHeight = parseInt(e.target.value);
+      shadow.getElementById("val-lh").textContent = S.lineHeight + "%";
+      applyLineHeight(S.lineHeight);
+    });
+
+    lsSlider.addEventListener("input", (e) => {
+      S.letterSpacing = parseInt(e.target.value);
+      shadow.getElementById("val-ls").textContent = S.letterSpacing + "px";
+      applyLetterSpacing(S.letterSpacing);
+    });
+
+    // Color pickers
+    shadow.getElementById("col-text").addEventListener("input", (e) => {
+      S.textColor = e.target.value;
+      applyTextColor(S.textColor);
+    });
+
+    shadow.getElementById("col-title").addEventListener("input", (e) => {
+      S.titleColor = e.target.value;
+      applyTitleColor(S.titleColor);
+    });
+
+    shadow.getElementById("col-bg").addEventListener("input", (e) => {
+      S.bgColor = e.target.value;
+      applyBgColor(S.bgColor);
+    });
+
+    // Reset buttons
+    shadow.querySelectorAll("[data-reset]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const r = btn.dataset.reset;
+        switch(r) {
+          case "fontSize": S.fontSize = 100; fsSlider.value = 100; shadow.getElementById("val-fs").textContent = "100%"; applyFontSize(100); break;
+          case "lineHeight": S.lineHeight = 100; lhSlider.value = 100; shadow.getElementById("val-lh").textContent = "100%"; applyLineHeight(100); break;
+          case "letterSpacing": S.letterSpacing = 0; lsSlider.value = 0; shadow.getElementById("val-ls").textContent = "0px"; applyLetterSpacing(0); break;
+          case "textColor": S.textColor = ""; shadow.getElementById("col-text").value = "#000000"; applyTextColor(""); break;
+          case "titleColor": S.titleColor = ""; shadow.getElementById("col-title").value = "#000000"; applyTitleColor(""); break;
+          case "bgColor": S.bgColor = ""; shadow.getElementById("col-bg").value = "#ffffff"; applyBgColor(""); break;
+        }
+      });
+    });
+
+    // Reset all
+    reset.addEventListener("click", () => {
+      Object.keys(S).forEach(k => {
+        if (typeof S[k] === "boolean") S[k] = false;
+        if (typeof S[k] === "number") S[k] = k === "fontSize" ? 100 : k === "lineHeight" ? 100 : 0;
+        if (typeof S[k] === "string" && k !== "tab") S[k] = "";
+      });
+      // Reset UI
+      shadow.querySelectorAll(".aw-profile-btn, .aw-btn, .aw-align-btn").forEach(b => b.classList.remove("active"));
+      fsSlider.value = 100; shadow.getElementById("val-fs").textContent = "100%";
+      lhSlider.value = 100; shadow.getElementById("val-lh").textContent = "100%";
+      lsSlider.value = 0; shadow.getElementById("val-ls").textContent = "0px";
+      shadow.getElementById("col-text").value = "#000000";
+      shadow.getElementById("col-title").value = "#000000";
+      shadow.getElementById("col-bg").value = "#ffffff";
+      // Reset page
+      resetAll();
+    });
+
+    console.log('[ADA] Widget initialized');
+  }
+
+  /* ── APPLY FUNCTIONS ──────────────────────────────────────────────────── */
+  function applyProfile(profile, enabled) {
+    const doc = document.documentElement;
+    switch(profile) {
+      case 'epilepsy':
+        doc.style.setProperty('--aw-epilepsy', enabled ? 'none' : '');
+        document.querySelectorAll('*, *::before, *::after').forEach(el => {
+          el.style.animation = enabled ? 'none !important' : '';
+          el.style.transition = enabled ? 'none !important' : '';
+        });
+        break;
+      case 'cognitive':
+        doc.classList.toggle('aw-cognitive', enabled);
+        break;
+      case 'adhd':
+        doc.classList.toggle('aw-adhd', enabled);
+        break;
+      case 'blindness':
+        doc.classList.toggle('aw-blindness', enabled);
+        break;
+      case 'visImpaired':
+        doc.classList.toggle('aw-vis-impaired', enabled);
+        break;
+    }
+  }
+
+  function applyFeature(feature, enabled) {
+    const doc = document.documentElement;
+    switch(feature) {
+      case 'readableFont':
+        doc.classList.toggle('aw-readable-font', enabled);
+        break;
+      case 'dyslexia':
+        doc.classList.toggle('aw-dyslexia', enabled);
+        break;
+      case 'highlightTitles':
+        doc.classList.toggle('aw-highlight-titles', enabled);
+        break;
+      case 'highlightLinks':
+        doc.classList.toggle('aw-highlight-links', enabled);
+        break;
+      case 'stopAnimations':
+        document.querySelectorAll('*, *::before, *::after').forEach(el => {
+          el.style.animationPlayState = enabled ? 'paused' : '';
+        });
+        break;
+      case 'muteSounds':
+        document.querySelectorAll('audio, video').forEach(el => {
+          el.muted = enabled;
+        });
+        break;
+      case 'hideImages':
+        doc.classList.toggle('aw-hide-images', enabled);
+        break;
+      case 'virtualKeyboard':
+        // Virtual keyboard implementation would go here
+        break;
+    }
+  }
+
+  function applyTextAlign(align) {
+    document.body.style.textAlign = align || '';
+  }
+
+  function applyContrast(contrast) {
+    const doc = document.documentElement;
+    doc.classList.remove('aw-contrast-dark', 'aw-contrast-light', 'aw-contrast-high');
+    if (contrast) doc.classList.add(`aw-contrast-${contrast}`);
+  }
+
+  function applyFontSize(size) {
+    document.documentElement.style.fontSize = size + '%';
+  }
+
+  function applyLineHeight(height) {
+    document.body.style.lineHeight = height + '%';
+  }
+
+  function applyLetterSpacing(spacing) {
+    document.body.style.letterSpacing = spacing + 'px';
+  }
+
+  function applyTextColor(color) {
+    document.body.style.color = color || '';
+  }
+
+  function applyTitleColor(color) {
+    document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(el => {
+      el.style.color = color || '';
+    });
+  }
+
+  function applyBgColor(color) {
+    document.body.style.backgroundColor = color || '';
+  }
+
+  function resetAll() {
+    const doc = document.documentElement;
+    doc.className = doc.className.replace(/aw-[^\s]*/g, '').trim();
+    document.body.style.cssText = '';
+    document.documentElement.style.cssText = '';
+    document.querySelectorAll('*, *::before, *::after').forEach(el => {
+      el.style.animation = '';
+      el.style.transition = '';
+      el.style.animationPlayState = '';
+    });
+    document.querySelectorAll('audio, video').forEach(el => {
+      el.muted = false;
+    });
+  }
+
+  /* ── START ────────────────────────────────────────────────────────────── */
+  loadWidget();
+})();
