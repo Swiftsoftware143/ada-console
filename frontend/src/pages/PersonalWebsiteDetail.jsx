@@ -220,6 +220,8 @@ export default function PersonalWebsiteDetail() {
       // Only include fields that are actually set
       if (website.name) updateData.name = website.name;
       if (website.domain) updateData.domain = cleanDomain(website.domain);
+      if (website.contact_email !== undefined) updateData.contact_email = website.contact_email || null;
+      if (website.contact_name !== undefined) updateData.contact_name = website.contact_name || null;
       if (website.plan_tier) updateData.plan_tier = website.plan_tier;
       
       // Handle tags - database expects text (comma-separated), not array
@@ -430,7 +432,31 @@ export default function PersonalWebsiteDetail() {
                 Stored cleanly on save (no https://, www., or trailing /).
               </p>
             </Field>
-            
+
+            {/* Contact Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Contact Name">
+                <Input
+                  value={website.contact_name || ''}
+                  onChange={(e) => update({ contact_name: e.target.value })}
+                  placeholder="John Doe"
+                  className="bg-[#0f1117] border-[#2e3245] text-white focus-visible:ring-[#007bff] focus-visible:border-transparent"
+                />
+              </Field>
+              <Field label="Contact Email">
+                <Input
+                  type="email"
+                  value={website.contact_email || ''}
+                  onChange={(e) => update({ contact_email: e.target.value })}
+                  placeholder="john@example.com"
+                  className="bg-[#0f1117] border-[#2e3245] text-white focus-visible:ring-[#007bff] focus-visible:border-transparent"
+                />
+                <p className="text-xs text-[#64748b] mt-1.5">
+                  Used for scan reports and widget delivery.
+                </p>
+              </Field>
+            </div>
+
             {/* Tags Field */}
             <Field label="Tags">
               {/* Current tags display */}
