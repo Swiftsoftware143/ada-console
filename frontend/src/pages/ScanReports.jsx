@@ -178,7 +178,7 @@ export default function ScanReports() {
     <div className="p-6 max-w-7xl mx-auto bg-[#0f1117] min-h-screen">
       <PageHeader
         title="ADA Scan Reports"
-        subtitle="Automated monthly accessibility compliance scanning"
+        subtitle="FREE automated monthly accessibility compliance scanning for all clients"
       />
 
       {/* Stats Overview */}
@@ -391,6 +391,9 @@ export default function ScanReports() {
       <Card className="mt-6 bg-[#1e2130] border-[#2e3245]">
         <CardHeader>
           <CardTitle className="text-white">How Monthly Scans Work</CardTitle>
+          <CardDescription className="text-[#94a3b8]">
+            🎉 Included FREE with every ADA widget subscription
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -404,12 +407,18 @@ export default function ScanReports() {
             </div>
             <div className="p-4 bg-[#0f1117] rounded-lg border border-[#2e3245]">
               <div className="text-[#007bff] font-bold mb-2">Generate Report</div>
-              <p className="text-sm text-[#94a3b8]">PDF report created with score and recommendations</p>
+              <p className="text-sm text-[#94a3b8]">Report created with accessibility score and findings</p>
             </div>
             <div className="p-4 bg-[#0f1117] rounded-lg border border-[#2e3245]">
               <div className="text-[#007bff] font-bold mb-2">Email Client</div>
-              <p className="text-sm text-[#94a3b8]">Report automatically emailed to client</p>
+              <p className="text-sm text-[#94a3b8]">Report automatically emailed to client at no extra cost</p>
             </div>
+          </div>
+          
+          <div className="mt-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+            <p className="text-green-400 text-sm">
+              <strong>✅ Free Feature:</strong> Monthly scan reports are included with every ADA widget subscription at no additional charge. Enable scans for your clients to provide ongoing value and demonstrate compliance progress.
+            </p>
           </div>
         </CardContent>
       </Card>
