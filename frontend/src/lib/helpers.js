@@ -55,7 +55,7 @@ export const preloadCdnDomain = async () => {
 
 export const generateEmbedCode = (domain, cdnDomain = "https://adaswift.netlify.app") => {
   const d = cleanDomain(domain) || "YOUR_DOMAIN_HERE";
-  return `<script>!function(){var s=document.createElement("script");s.src="${cdnDomain}/loader.js";s.setAttribute("data-domain","${d}");s.async=!0;document.body.appendChild(s)}();</script>`;
+  return `<script>!function(){var s=document.createElement("script");s.src="${cdnDomain}/loader.js?v=2";s.setAttribute("data-domain","${d}");s.async=!0;document.body.appendChild(s)}();</script>`;
 };
 
 export const formatDate = (iso) => {
