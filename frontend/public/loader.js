@@ -94,6 +94,13 @@
       }
       
       let clientData = await clientRes.json();
+      
+      // Check if response is an error
+      if (clientData && (clientData.error || clientData.message || clientData.code)) {
+        console.error('[ADA] Supabase error:', clientData);
+        clientData = []; // Reset to empty array on error
+      }
+      
       console.log('[ADA] Client data:', clientData);
       
       // If not found, try root domain
@@ -125,6 +132,12 @@
         }
         
         clientData = await personalRes.json();
+        
+        // Check if response is an error
+        if (clientData && (clientData.error || clientData.message || clientData.code)) {
+          console.error('[ADA] Supabase error (personal):', clientData);
+          clientData = [];
+        }
         
         // Try root domain for personal_websites too
         if (!clientData || clientData.length === 0) {
