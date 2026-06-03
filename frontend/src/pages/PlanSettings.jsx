@@ -1,40 +1,30 @@
 import { useState, useEffect } from "react";
-import { Save, RefreshCw, Info, Check } from "lucide-react";
+import { Save, RefreshCw, DollarSign, FileText, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
-const defaultThresholds = {
-  basic_max: 5,
-  starter_max: 25,
-  pro_max: 100,
-  growth_max: 500,
-};
+const defaultPlans = [
+  { id: 'basic', name: 'Basic', max_pages: 5, price: 0, features: { profiles: true, content: true, display: true, keyboard: false } },
+  { id: 'starter', name: 'Starter', max_pages: 25, price: 47, features: { profiles: true, content: true, display: true, keyboard: false } },
+  { id: 'pro', name: 'Pro', max_pages: 100, price: 97, features: { profiles: true, content: true, display: true, keyboard: true } },
+  { id: 'growth', name: 'Growth', max_pages: 500, price: 297, features: { profiles: true, content: true, display: true, keyboard: true } },
+  { id: 'enterprise', name: 'Enterprise', max_pages: 999999, price: 0, features: { profiles: true, content: true, display: true, keyboard: true } },
+];
 
-const defaultFeatures = {
-  basic: { profiles: true, content: true, display: true, virtualKeyboard: false },
-  starter: { profiles: true, content: true, display: true, virtualKeyboard: false },
-  pro: { profiles: true, content: true, display: true, virtualKeyboard: true },
-  growth: { profiles: true, content: true, display: true, virtualKeyboard: true },
-  enterprise: { profiles: true, content: true, display: true, virtualKeyboard: true },
-};
-
-const planPricing = {
-  basic: "$0",
-  starter: "$47/mo",
-  pro: "$97/mo",
-  growth: "$297/mo",
-  enterprise: "Custom",
+const featureLabels = {
+  profiles: 'Accessibility Profiles',
+  content: 'Content Adjustments',
+  display: 'Display & Colors',
+  keyboard: 'Virtual Keyboard'
 };
 
 export default function PlanSettings() {
-  const [thresholds, setThresholds] = useState(defaultThresholds);
-  const [features, setFeatures] = useState(defaultFeatures);
+  const [plans, setPlans] = useState(defaultPlans);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -44,28 +34,19 @@ export default function PlanSettings() {
 
   const loadSettings = async () => {
     try {
-      // Load thresholds
-      const { data: thresholdsData } = await supabase
+      const { data } = await supabase
         .from("settings")
         .select("value")
-        .eq("key", "plan_thresholds")
+        .eq("key", "plan_config")
         .maybeSingle();
 
-      if (thresholdsData?.value) {
-        const parsed = typeof thresholdsData.value === "string" ? JSON.parse(thresholdsData.value) : thresholdsData.value;
-        setThresholds({ ...defaultThresholds, ...parsed });
-      }
-
-      // Load features
-      const { data: featuresData } = await supabase
-        .from("settings")
-        .select("value")
-        .eq("key", "plan_features")
-        .maybeSingle();
-
-      if (featuresData?.value) {
-        const parsed = typeof featuresData.value === "string" ? JSON.parse(featuresData.value) : featuresData.value;
-        setFeatures({ ...defaultFeatures, ...parsed });
+      if (data?.value) {
+        const parsed = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+        // Merge with defaults to ensure all fields exist
+        setPlans(defaultPlans.map(defaultPlan => ({
+          ...defaultPlan,
+          ...parsed.find(p => p.id === defaultPlan.id)
+        })));
       }
     } catch (e) {
       console.error("Error loading settings:", e);
@@ -77,64 +58,37 @@ export default function PlanSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Validate thresholds
-      const { basic_max, starter_max, pro_max, growth_max } = thresholds;
-      
-      if (basic_max >= starter_max || starter_max >= pro_max || pro_max >= growth_max) {
-        toast.error("Each plan must have a higher page limit than the previous");
-        return;
-      }
+      await supabase.from("settings").upsert({
+        key: "plan_config",
+        value: JSON.stringify(plans),
+        updated_at: new Date().toISOString()
+      }, { onConflict: "key" });
 
-      // Save thresholds
-      const { error: thresholdsError } = await supabase
-        .from("settings")
-        .upsert(
-          {
-            key: "plan_thresholds",
-            value: JSON.stringify(thresholds),
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "key" }
-        );
-
-      if (thresholdsError) throw thresholdsError;
-
-      // Save features
-      const { error: featuresError } = await supabase
-        .from("settings")
-        .upsert(
-          {
-            key: "plan_features",
-            value: JSON.stringify(features),
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "key" }
-        );
-
-      if (featuresError) throw featuresError;
-
-      toast.success("Plan settings saved successfully");
+      toast.success("Plan settings saved");
     } catch (e) {
-      toast.error("Failed to save settings: " + e.message);
-    } finally {
-      setSaving(false);
+      toast.error("Failed to save settings");
     }
+    setSaving(false);
+  };
+
+  const updatePlan = (planId, field, value) => {
+    setPlans(prev => prev.map(plan => 
+      plan.id === planId ? { ...plan, [field]: value } : plan
+    ));
+  };
+
+  const updateFeature = (planId, feature, enabled) => {
+    setPlans(prev => prev.map(plan => 
+      plan.id === planId ? { 
+        ...plan, 
+        features: { ...plan.features, [feature]: enabled }
+      } : plan
+    ));
   };
 
   const handleReset = () => {
-    setThresholds(defaultThresholds);
-    setFeatures(defaultFeatures);
-    toast.info("Reset to default values. Click Save to apply.");
-  };
-
-  const updateFeature = (plan, feature, enabled) => {
-    setFeatures(prev => ({
-      ...prev,
-      [plan]: {
-        ...prev[plan],
-        [feature]: enabled
-      }
-    }));
+    setPlans(defaultPlans);
+    toast.info("Reset to defaults. Click Save to apply.");
   };
 
   if (loading) {
@@ -152,125 +106,92 @@ export default function PlanSettings() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Plan Settings</h1>
         <p className="text-[#94a3b8] mt-1">
-          Configure automatic plan assignment and feature availability
+          Configure page limits, pricing, and features for each plan tier
         </p>
       </div>
 
-      <Alert className="mb-6 bg-[#1e2130] border-[#2e3245] text-[#94a3b8]">
-        <Info className="h-4 w-4 text-[#007bff]" />
-        <AlertDescription className="text-[#94a3b8]">
-          The widget detects page count and assigns plans automatically. Control which features 
-          are available for each plan tier below.
-        </AlertDescription>
-      </Alert>
-
       <div className="grid gap-6">
-        {/* Page Threshold Settings */}
-        <Card className="bg-[#1e2130] border-[#2e3245]">
-          <CardHeader>
-            <CardTitle className="text-white">Page Count Thresholds</CardTitle>
-            <CardDescription className="text-[#94a3b8]">
-              Set the maximum page count for each plan tier
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {[
-                { key: 'basic_max', label: 'Basic', pages: `1-${thresholds.basic_max}` },
-                { key: 'starter_max', label: 'Starter', pages: `${thresholds.basic_max + 1}-${thresholds.starter_max}` },
-                { key: 'pro_max', label: 'Pro', pages: `${thresholds.starter_max + 1}-${thresholds.pro_max}` },
-                { key: 'growth_max', label: 'Growth', pages: `${thresholds.pro_max + 1}-${thresholds.growth_max}` },
-                { key: 'enterprise', label: 'Enterprise', pages: `${thresholds.growth_max + 1}+` },
-              ].map((plan) => (
-                <div key={plan.key} className="space-y-2">
-                  <Label className="text-[#94a3b8]">{plan.label}</Label>
-                  {plan.key !== 'enterprise' ? (
+        {plans.map((plan) => (
+          <Card key={plan.id} className="bg-[#1e2130] border-[#2e3245]">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white text-xl capitalize">{plan.name}</CardTitle>
+                {plan.id === 'enterprise' && (
+                  <span className="text-xs bg-[#007bff]/20 text-[#007bff] px-2 py-1 rounded">Custom Pricing</span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Page Count */}
+                <div className="space-y-2">
+                  <Label className="text-[#94a3b8] flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Max Pages
+                  </Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={plan.max_pages}
+                    onChange={(e) => updatePlan(plan.id, 'max_pages', parseInt(e.target.value) || 0)}
+                    className="bg-[#0f1117] border-[#2e3245] text-white"
+                    disabled={plan.id === 'enterprise'}
+                  />
+                  {plan.id !== 'enterprise' && (
+                    <p className="text-xs text-[#64748b]">
+                      {plan.id === 'basic' ? '1' : plans[plans.findIndex(p => p.id === plan.id) - 1].max_pages + 1} - {plan.max_pages} pages
+                    </p>
+                  )}
+                </div>
+
+                {/* Price */}
+                <div className="space-y-2">
+                  <Label className="text-[#94a3b8] flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Monthly Price
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748b]">$</span>
                     <Input
                       type="number"
-                      min="1"
-                      value={thresholds[plan.key]}
-                      onChange={(e) =>
-                        setThresholds({ ...thresholds, [plan.key]: parseInt(e.target.value) || 0 })
-                      }
-                      className="bg-[#0f1117] border-[#2e3245] text-white"
+                      min="0"
+                      value={plan.price}
+                      onChange={(e) => updatePlan(plan.id, 'price', parseInt(e.target.value) || 0)}
+                      className="bg-[#0f1117] border-[#2e3245] text-white pl-7"
+                      disabled={plan.id === 'enterprise'}
                     />
-                  ) : (
-                    <div className="h-10 flex items-center text-[#64748b]">Unlimited</div>
+                  </div>
+                  {plan.id !== 'enterprise' && (
+                    <p className="text-xs text-[#64748b]">${plan.price}/mo</p>
                   )}
-                  <p className="text-sm text-[#64748b]">{plan.pages} pages</p>
-                  <p className="text-sm text-[#007bff] font-medium">{planPricing[plan.key.replace('_max', '')]}</p>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Feature Controls */}
-        <Card className="bg-[#1e2130] border-[#2e3245]">
-          <CardHeader>
-            <CardTitle className="text-white">Feature Availability by Plan</CardTitle>
-            <CardDescription className="text-[#94a3b8]">
-              Control which widget features are available for each plan tier
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-              {Object.entries(features).map(([plan, planFeatures]) => (
-                <div key={plan} className="space-y-4">
-                  <h3 className="font-semibold text-white capitalize text-center pb-2 border-b border-[#2e3245]">
-                    {plan}
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`${plan}-profiles`}
-                        checked={planFeatures.profiles}
-                        onCheckedChange={(checked) => updateFeature(plan, 'profiles', checked)}
-                        className="border-[#2e3245]"
-                      />
-                      <Label htmlFor={`${plan}-profiles`} className="text-[#94a3b8] text-sm">
-                        Accessibility Profiles
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`${plan}-content`}
-                        checked={planFeatures.content}
-                        onCheckedChange={(checked) => updateFeature(plan, 'content', checked)}
-                        className="border-[#2e3245]"
-                      />
-                      <Label htmlFor={`${plan}-content`} className="text-[#94a3b8] text-sm">
-                        Content Adjustments
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`${plan}-display`}
-                        checked={planFeatures.display}
-                        onCheckedChange={(checked) => updateFeature(plan, 'display', checked)}
-                        className="border-[#2e3245]"
-                      />
-                      <Label htmlFor={`${plan}-display`} className="text-[#94a3b8] text-sm">
-                        Display & Colors
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`${plan}-virtualKeyboard`}
-                        checked={planFeatures.virtualKeyboard}
-                        onCheckedChange={(checked) => updateFeature(plan, 'virtualKeyboard', checked)}
-                        className="border-[#2e3245]"
-                      />
-                      <Label htmlFor={`${plan}-virtualKeyboard`} className="text-[#94a3b8] text-sm">
-                        Virtual Keyboard
-                      </Label>
-                    </div>
+                {/* Features */}
+                <div className="space-y-3">
+                  <Label className="text-[#94a3b8]">Features</Label>
+                  <div className="space-y-2">
+                    {Object.entries(featureLabels).map(([key, label]) => (
+                      <div key={key} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`${plan.id}-${key}`}
+                          checked={plan.features[key]}
+                          onCheckedChange={(checked) => updateFeature(plan.id, key, checked)}
+                          className="border-[#2e3245]"
+                        />
+                        <Label 
+                          htmlFor={`${plan.id}-${key}`}
+                          className="text-sm text-[#94a3b8] cursor-pointer"
+                        >
+                          {label}
+                        </Label>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
 
         {/* Summary */}
         <Card className="bg-[#1e2130] border-[#2e3245]">
@@ -289,23 +210,25 @@ export default function PlanSettings() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    { name: 'Basic', pages: `1-${thresholds.basic_max}`, price: planPricing.basic, features: features.basic },
-                    { name: 'Starter', pages: `${thresholds.basic_max + 1}-${thresholds.starter_max}`, price: planPricing.starter, features: features.starter },
-                    { name: 'Pro', pages: `${thresholds.starter_max + 1}-${thresholds.pro_max}`, price: planPricing.pro, features: features.pro },
-                    { name: 'Growth', pages: `${thresholds.pro_max + 1}-${thresholds.growth_max}`, price: planPricing.growth, features: features.growth },
-                    { name: 'Enterprise', pages: `${thresholds.growth_max + 1}+`, price: planPricing.enterprise, features: features.enterprise },
-                  ].map((plan) => (
-                    <tr key={plan.name} className="border-b border-[#2e3245]">
-                      <td className="py-3 text-white font-medium">{plan.name}</td>
-                      <td className="py-3 text-[#94a3b8]">{plan.pages}</td>
-                      <td className="py-3 text-[#007bff]">{plan.price}</td>
+                  {plans.map((plan) => (
+                    <tr key={plan.id} className="border-b border-[#2e3245]">
+                      <td className="py-3 text-white font-medium capitalize">{plan.name}</td>
+                      <td className="py-3 text-[#94a3b8]">
+                        {plan.id === 'enterprise' ? '500+' : 
+                          `${plan.id === 'basic' ? '1' : plans[plans.findIndex(p => p.id === plan.id) - 1].max_pages + 1}-${plan.max_pages}`}
+                      </td>
+                      <td className="py-3 text-[#007bff]">
+                        {plan.id === 'enterprise' ? 'Custom' : `$${plan.price}/mo`}
+                      </td>
                       <td className="py-3">
-                        <div className="flex gap-2">
-                          {plan.features.profiles && <span className="text-xs bg-[#007bff20] text-[#007bff] px-2 py-1 rounded">Profiles</span>}
-                          {plan.features.content && <span className="text-xs bg-[#007bff20] text-[#007bff] px-2 py-1 rounded">Content</span>}
-                          {plan.features.display && <span className="text-xs bg-[#007bff20] text-[#007bff] px-2 py-1 rounded">Display</span>}
-                          {plan.features.virtualKeyboard && <span className="text-xs bg-[#007bff20] text-[#007bff] px-2 py-1 rounded">Keyboard</span>}
+                        <div className="flex gap-2 flex-wrap">
+                          {Object.entries(plan.features)
+                            .filter(([_, enabled]) => enabled)
+                            .map(([key]) => (
+                              <span key={key} className="text-xs bg-[#007bff20] text-[#007bff] px-2 py-1 rounded">
+                                {featureLabels[key]}
+                              </span>
+                            ))}
                         </div>
                       </td>
                     </tr>
