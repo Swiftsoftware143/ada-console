@@ -298,6 +298,9 @@
     host.style.cssText = `position:fixed;${posStyle}z-index:2147483647;`;
     document.body.appendChild(host);
     const shadow = host.attachShadow({ mode: "open" });
+    
+    // Store shadow reference globally for virtual keyboard access
+    window.__adaShadow = shadow;
 
     /* ── STYLES ─────────────────────────────────────────────────────────── */
     const STYLE = `
@@ -748,6 +751,95 @@
       });
     });
 
+    // Virtual keyboard key handlers
+    const vkb = shadow.getElementById('aw-vkb');
+    const vkbClose = shadow.getElementById('aw-vkb-close');
+    
+    // Close keyboard button
+    if (vkbClose) {
+      vkbClose.addEventListener('click', () => {
+        S.virtualKeyboard = false;
+        shadow.querySelector('[data-feat="virtualKeyboard"]')?.classList.remove('active');
+        vkb.classList.remove('visible');
+        vkb.style.display = 'none';
+      });
+    }
+    
+    // Keyboard keys
+    shadow.querySelectorAll('.aw-key').forEach(key => {
+      key.addEventListener('click', (e) => {
+        e.preventDefault();
+        const keyValue = key.dataset.k;
+        const activeElement = document.activeElement;
+        
+        if (!activeElement || (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA')) {
+          // Try to find an input to focus
+          const firstInput = document.querySelector('input:not([type="hidden"]), textarea');
+          if (firstInput) {
+            firstInput.focus();
+            firstInput.click();
+          }
+          return;
+        }
+        
+        // Handle special keys
+        switch(keyValue) {
+          case 'Backspace':
+            if (activeElement.selectionStart || activeElement.selectionStart === 0) {
+              const start = activeElement.selectionStart;
+              const end = activeElement.selectionEnd;
+              if (start === end && start > 0) {
+                activeElement.value = activeElement.value.substring(0, start - 1) + activeElement.value.substring(end);
+                activeElement.selectionStart = activeElement.selectionEnd = start - 1;
+              } else if (start !== end) {
+                activeElement.value = activeElement.value.substring(0, start) + activeElement.value.substring(end);
+                activeElement.selectionStart = activeElement.selectionEnd = start;
+              }
+            } else {
+              activeElement.value = activeElement.value.slice(0, -1);
+            }
+            break;
+          case 'Enter':
+            activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter' }));
+            if (activeElement.form) {
+              const submitBtn = activeElement.form.querySelector('button[type="submit"], input[type="submit"]');
+              if (submitBtn) submitBtn.click();
+            }
+            break;
+          case 'Tab':
+            const focusable = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, button, select, a[href]'));
+            const currentIndex = focusable.indexOf(activeElement);
+            const nextIndex = (currentIndex + 1) % focusable.length;
+            if (focusable[nextIndex]) {
+              focusable[nextIndex].focus();
+              focusable[nextIndex].click();
+            }
+            break;
+          case 'Space':
+          case ' ':
+            insertAtCursor(activeElement, ' ');
+            break;
+          default:
+            insertAtCursor(activeElement, keyValue);
+        }
+        
+        // Trigger input event
+        activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    });
+    
+    // Helper function to insert text at cursor position
+    function insertAtCursor(element, text) {
+      if (element.selectionStart || element.selectionStart === 0) {
+        const start = element.selectionStart;
+        const end = element.selectionEnd;
+        element.value = element.value.substring(0, start) + text + element.value.substring(end);
+        element.selectionStart = element.selectionEnd = start + text.length;
+      } else {
+        element.value += text;
+      }
+    }
+
     // Reset all
     reset.addEventListener("click", () => {
       Object.keys(S).forEach(k => {
@@ -763,6 +855,11 @@
       shadow.getElementById("col-text").value = "#000000";
       shadow.getElementById("col-title").value = "#000000";
       shadow.getElementById("col-bg").value = "#ffffff";
+      // Hide virtual keyboard
+      if (vkb) {
+        vkb.classList.remove('visible');
+        vkb.style.display = 'none';
+      }
       // Reset page
       resetAll();
     });
@@ -825,14 +922,23 @@
         doc.classList.toggle('aw-hide-images', enabled);
         break;
       case 'virtualKeyboard':
-        const vkb = shadow.getElementById('aw-vkb');
+        const shadowRoot = window.__adaShadow;
+        if (!shadowRoot) return;
+        const vkb = shadowRoot.getElementById('aw-vkb');
+        if (!vkb) return;
+        
         if (enabled) {
           vkb.classList.add('visible');
-          // Focus on first input
-          const firstInput = document.querySelector('input, textarea');
-          if (firstInput) firstInput.focus();
+          vkb.style.display = 'flex';
+          // Focus on first input on the page
+          const firstInput = document.querySelector('input:not([type="hidden"]), textarea');
+          if (firstInput) {
+            firstInput.focus();
+            firstInput.click();
+          }
         } else {
           vkb.classList.remove('visible');
+          vkb.style.display = 'none';
         }
         break;
     }
