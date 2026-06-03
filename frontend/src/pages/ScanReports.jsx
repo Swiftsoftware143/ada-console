@@ -73,48 +73,118 @@ export default function ScanReports() {
 
   const toggleClientScan = async (clientId, enabled) => {
     try {
-      await supabase
+      // First check if a record exists
+      const { data: existing } = await supabase
         .from('client_scan_settings')
-        .upsert({
-          client_id: clientId,
-          monthly_scan_enabled: enabled,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'client_id' });
+        .select('id')
+        .eq('client_id', clientId)
+        .maybeSingle();
 
+      let result;
+      if (existing) {
+        // Update existing record
+        result = await supabase
+          .from('client_scan_settings')
+          .update({
+            monthly_scan_enabled: enabled,
+            updated_at: new Date().toISOString()
+          })
+          .eq('client_id', clientId);
+      } else {
+        // Insert new record
+        result = await supabase
+          .from('client_scan_settings')
+          .insert({
+            client_id: clientId,
+            monthly_scan_enabled: enabled,
+            scan_count: 0
+          });
+      }
+
+      if (result.error) {
+        console.error('Toggle error:', result.error);
+        toast.error('Failed to update setting: ' + result.error.message);
+        return;
+      }
+
+      // Update local state immediately
       setScanSettings(prev => ({
         ...prev,
-        [clientId]: { ...prev[clientId], monthly_scan_enabled: enabled }
+        [clientId]: { 
+          ...prev[clientId], 
+          monthly_scan_enabled: enabled,
+          client_id: clientId
+        }
       }));
 
       toast.success(enabled ? 'Monthly scan enabled' : 'Monthly scan disabled');
     } catch (err) {
-      toast.error('Failed to update setting');
+      console.error('Toggle exception:', err);
+      toast.error('Failed to update setting: ' + err.message);
     }
   };
 
   const toggleAll = async (enabled) => {
     try {
-      // Update all clients
-      const updates = clients.map(client => ({
-        client_id: client.id,
-        monthly_scan_enabled: enabled,
-        updated_at: new Date().toISOString()
-      }));
-
-      await supabase
+      // Get existing settings to determine which need insert vs update
+      const { data: existingSettings } = await supabase
         .from('client_scan_settings')
-        .upsert(updates, { onConflict: 'client_id' });
+        .select('client_id');
+      
+      const existingClientIds = new Set(existingSettings?.map(s => s.client_id) || []);
+      
+      // Separate into updates and inserts
+      const toUpdate = [];
+      const toInsert = [];
+      
+      clients.forEach(client => {
+        if (existingClientIds.has(client.id)) {
+          toUpdate.push({
+            client_id: client.id,
+            monthly_scan_enabled: enabled,
+            updated_at: new Date().toISOString()
+          });
+        } else {
+          toInsert.push({
+            client_id: client.id,
+            monthly_scan_enabled: enabled,
+            scan_count: 0
+          });
+        }
+      });
+
+      // Perform updates
+      if (toUpdate.length > 0) {
+        for (const update of toUpdate) {
+          await supabase
+            .from('client_scan_settings')
+            .update(update)
+            .eq('client_id', update.client_id);
+        }
+      }
+
+      // Perform inserts
+      if (toInsert.length > 0) {
+        await supabase
+          .from('client_scan_settings')
+          .insert(toInsert);
+      }
 
       // Update local state
       const newSettings = {};
       clients.forEach(client => {
-        newSettings[client.id] = { ...scanSettings[client.id], monthly_scan_enabled: enabled };
+        newSettings[client.id] = { 
+          ...scanSettings[client.id], 
+          monthly_scan_enabled: enabled,
+          client_id: client.id
+        };
       });
       setScanSettings(newSettings);
 
-      toast.success(enabled ? 'Monthly scans enabled for all clients' : 'Monthly scans disabled for all clients');
+      toast.success(enabled ? `Monthly scans enabled for all ${clients.length} clients` : 'Monthly scans disabled for all clients');
     } catch (err) {
-      toast.error('Failed to update all clients');
+      console.error('Toggle all error:', err);
+      toast.error('Failed to update all clients: ' + err.message);
     }
   };
 
