@@ -73,11 +73,15 @@
 
   /* ── FETCH CLIENT CONFIG FROM SUPABASE ─────────────────────────────────── */
   async function loadWidget() {
-    const domainFilter = `domain=eq.${encodeURIComponent(CURRENT_DOMAIN)},domain=eq.${encodeURIComponent(ROOT_DOMAIN)}`;
+    // Build domain filter - try exact domain match first, then root domain
+    const domainFilter = `domain=eq.${encodeURIComponent(CURRENT_DOMAIN)}`;
+    const rootDomainFilter = `domain=eq.${encodeURIComponent(ROOT_DOMAIN)}`;
     
     try {
-      // Fetch client config
-      const clientRes = await fetch(`${SUPABASE_URL}/rest/v1/clients?or=(${domainFilter})&select=*&limit=1`, {
+      console.log('[ADA] Fetching client for domain:', CURRENT_DOMAIN);
+      
+      // Fetch client config - try exact domain first
+      let clientRes = await fetch(`${SUPABASE_URL}/rest/v1/clients?${domainFilter}&select=*&limit=1`, {
         headers: {
           "apikey": SUPABASE_ANON,
           "Authorization": `Bearer ${SUPABASE_ANON}`,
@@ -85,18 +89,54 @@
         }
       });
       
-      let clientData = await clientRes.json();
+      if (!clientRes.ok) {
+        console.log('[ADA] Client query failed, status:', clientRes.status);
+      }
       
-      // If not found in clients, try personal_websites
+      let clientData = await clientRes.json();
+      console.log('[ADA] Client data:', clientData);
+      
+      // If not found, try root domain
       if (!clientData || clientData.length === 0) {
-        const personalRes = await fetch(`${SUPABASE_URL}/rest/v1/personal_websites?or=(${domainFilter})&select=*&limit=1`, {
+        console.log('[ADA] Trying root domain:', ROOT_DOMAIN);
+        clientRes = await fetch(`${SUPABASE_URL}/rest/v1/clients?${rootDomainFilter}&select=*&limit=1`, {
           headers: {
             "apikey": SUPABASE_ANON,
             "Authorization": `Bearer ${SUPABASE_ANON}`,
             "Content-Type": "application/json"
           }
         });
+        clientData = await clientRes.json();
+      }
+      
+      // If not found in clients, try personal_websites
+      if (!clientData || clientData.length === 0) {
+        console.log('[ADA] Trying personal_websites table...');
+        let personalRes = await fetch(`${SUPABASE_URL}/rest/v1/personal_websites?${domainFilter}&select=*&limit=1`, {
+          headers: {
+            "apikey": SUPABASE_ANON,
+            "Authorization": `Bearer ${SUPABASE_ANON}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (!personalRes.ok) {
+          console.log('[ADA] Personal websites query failed, status:', personalRes.status);
+        }
+        
         clientData = await personalRes.json();
+        
+        // Try root domain for personal_websites too
+        if (!clientData || clientData.length === 0) {
+          personalRes = await fetch(`${SUPABASE_URL}/rest/v1/personal_websites?${rootDomainFilter}&select=*&limit=1`, {
+            headers: {
+              "apikey": SUPABASE_ANON,
+              "Authorization": `Bearer ${SUPABASE_ANON}`,
+              "Content-Type": "application/json"
+            }
+          });
+          clientData = await personalRes.json();
+        }
       }
       
       if (!clientData || clientData.length === 0) {
@@ -104,8 +144,19 @@
         return;
       }
       
+      // Handle case where response might be an error object
+      if (clientData.error || clientData.message) {
+        console.error('[ADA] API error:', clientData);
+        return;
+      }
+      
       const client = clientData[0];
-      console.log('[ADA] Client found:', client.name, 'Active:', client.active);
+      if (!client) {
+        console.error('[ADA] Client data is empty');
+        return;
+      }
+      
+      console.log('[ADA] Client found:', client.name || 'Unknown', 'Active:', client.active);
       
       if (!client.active) {
         console.log('[ADA] Client inactive, not loading widget');
@@ -113,16 +164,23 @@
       }
       
       // Fetch plan settings from admin
-      const settingsRes = await fetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.plan_thresholds&select=value&limit=1`, {
-        headers: {
-          "apikey": SUPABASE_ANON,
-          "Authorization": `Bearer ${SUPABASE_ANON}`,
-          "Content-Type": "application/json"
+      let planSettings = null;
+      try {
+        const settingsRes = await fetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.plan_config&select=value&limit=1`, {
+          headers: {
+            "apikey": SUPABASE_ANON,
+            "Authorization": `Bearer ${SUPABASE_ANON}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          planSettings = settingsData?.[0]?.value ? JSON.parse(settingsData[0].value) : null;
         }
-      });
-      
-      const settingsData = await settingsRes.json();
-      const planSettings = settingsData?.[0]?.value ? JSON.parse(settingsData[0].value) : null;
+      } catch (e) {
+        console.log('[ADA] Could not load plan settings, using defaults');
+      }
       
       // Count pages and determine dynamic plan
       const pageCount = await countPages();
@@ -133,21 +191,27 @@
       // Use detected plan or client's assigned plan (whichever is higher)
       const finalPlan = getHigherPlan(client.plan_tier, detectedPlan);
       
-      // Update client record with detected plan
-      await fetch(`${SUPABASE_URL}/rest/v1/personal_websites?id=eq.${client.id}`, {
-        method: 'PATCH',
-        headers: {
-          "apikey": SUPABASE_ANON,
-          "Authorization": `Bearer ${SUPABASE_ANON}`,
-          "Content-Type": "application/json",
-          "Prefer": "return=minimal"
-        },
-        body: JSON.stringify({
-          detected_plan: detectedPlan,
-          page_count: pageCount,
-          detected_at: new Date().toISOString()
-        })
-      });
+      // Update client record with detected plan (only if personal_websites table)
+      if (client.table === 'personal_websites') {
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/personal_websites?id=eq.${client.id}`, {
+            method: 'PATCH',
+            headers: {
+              "apikey": SUPABASE_ANON,
+              "Authorization": `Bearer ${SUPABASE_ANON}`,
+              "Content-Type": "application/json",
+              "Prefer": "return=minimal"
+            },
+            body: JSON.stringify({
+              detected_plan: detectedPlan,
+              page_count: pageCount,
+              detected_at: new Date().toISOString()
+            })
+          });
+        } catch (e) {
+          console.log('[ADA] Could not update client record');
+        }
+      }
       
       // Inject widget with final plan
       injectWidget(client, finalPlan, pageCount);
