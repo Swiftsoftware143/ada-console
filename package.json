@@ -5,6 +5,9 @@
   "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
-    "nodemailer": "^6.9.7"
+    "@sparticuz/chromium": "^119.0.0",
+    "nodemailer": "^6.9.7",
+    "pa11y": "^8.0.0",
+    "puppeteer-core": "^21.0.0"
   }
 }
