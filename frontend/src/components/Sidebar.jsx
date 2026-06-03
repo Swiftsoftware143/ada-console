@@ -1,11 +1,12 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Users, Code2, Zap, Settings, Globe, Puzzle } from "lucide-react";
+import { LayoutDashboard, Users, Code2, Zap, Settings, Globe, Puzzle, Mail } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, testId: "nav-dashboard" },
   { to: "/clients", label: "Clients", icon: Users, testId: "nav-clients" },
   { to: "/personal-websites", label: "Personal Websites", icon: Globe, testId: "nav-personal-websites" },
   { to: "/widget-requests", label: "Widget Requests", icon: Puzzle, testId: "nav-widget-requests" },
+  { to: "/email-templates", label: "Email Templates", icon: Mail, testId: "nav-email-templates" },
   { to: "/embed", label: "Embed Code", icon: Code2, testId: "nav-embed" },
   { to: "/settings", label: "Settings", icon: Settings, testId: "nav-settings" },
 ];

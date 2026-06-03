@@ -1,0 +1,8 @@
+{
+  "name": "adaswift-netlify-functions",
+  "version": "1.0.0",
+  "description": "Netlify functions for ADA Swift Console",
+  "dependencies": {
+    "nodemailer": "^6.9.7"
+  }
+}

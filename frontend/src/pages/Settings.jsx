@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Save, Globe, Building2, Check, Tag, Plus, Trash2 } from "lucide-react";
+import { Save, Globe, Building2, Check, Tag, Plus, Trash2, Mail, Server, Lock, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,14 @@ export default function Settings() {
   const [previewDomain, setPreviewDomain] = useState("clientdomain.com");
   const [agencyName, setAgencyName] = useState(DEFAULT_AGENCY_NAME);
   const [ctaUrl, setCtaUrl] = useState(DEFAULT_CTA_URL);
+  
+  // SMTP Settings
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("587");
+  const [smtpUsername, setSmtpUsername] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpSecure, setSmtpSecure] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
@@ -30,6 +38,18 @@ export default function Settings() {
       if (agencyData?.value) setAgencyName(agencyData.value);
       const { data: ctaData } = await supabase.from("settings").select("value").eq("key", "cta_url").maybeSingle();
       if (ctaData?.value) setCtaUrl(ctaData.value);
+      
+      // Load SMTP settings
+      const { data: smtpHostData } = await supabase.from("settings").select("value").eq("key", "smtp_host").maybeSingle();
+      if (smtpHostData?.value) setSmtpHost(smtpHostData.value);
+      const { data: smtpPortData } = await supabase.from("settings").select("value").eq("key", "smtp_port").maybeSingle();
+      if (smtpPortData?.value) setSmtpPort(smtpPortData.value);
+      const { data: smtpUserData } = await supabase.from("settings").select("value").eq("key", "smtp_username").maybeSingle();
+      if (smtpUserData?.value) setSmtpUsername(smtpUserData.value);
+      const { data: smtpPassData } = await supabase.from("settings").select("value").eq("key", "smtp_password").maybeSingle();
+      if (smtpPassData?.value) setSmtpPassword(smtpPassData.value);
+      const { data: smtpSecureData } = await supabase.from("settings").select("value").eq("key", "smtp_secure").maybeSingle();
+      if (smtpSecureData?.value) setSmtpSecure(smtpSecureData.value === "true");
     } catch (e) { console.error(e); }
     setLoading(false);
   }, []);
@@ -57,6 +77,21 @@ export default function Settings() {
       await supabase.from("settings").upsert({ key: "cta_url", value: ctaUrl, updated_at: new Date().toISOString() });
       toast.success("Agency defaults saved");
     } catch (e) { toast.error("Failed to save agency defaults"); }
+    setSaving(false);
+  };
+
+  const handleSaveSMTP = async () => {
+    setSaving(true);
+    try {
+      await supabase.from("settings").upsert({ key: "smtp_host", value: smtpHost, updated_at: new Date().toISOString() });
+      await supabase.from("settings").upsert({ key: "smtp_port", value: smtpPort, updated_at: new Date().toISOString() });
+      await supabase.from("settings").upsert({ key: "smtp_username", value: smtpUsername, updated_at: new Date().toISOString() });
+      await supabase.from("settings").upsert({ key: "smtp_password", value: smtpPassword, updated_at: new Date().toISOString() });
+      await supabase.from("settings").upsert({ key: "smtp_secure", value: smtpSecure ? "true" : "false", updated_at: new Date().toISOString() });
+      toast.success("SMTP settings saved!");
+    } catch (e) { 
+      toast.error("Failed to save SMTP settings");
+    }
     setSaving(false);
   };
 
@@ -115,8 +150,133 @@ export default function Settings() {
         </CardContent>
       </Card>
       
+      <SMTPSettingsCard 
+        smtpHost={smtpHost}
+        setSmtpHost={setSmtpHost}
+        smtpPort={smtpPort}
+        setSmtpPort={setSmtpPort}
+        smtpUsername={smtpUsername}
+        setSmtpUsername={setSmtpUsername}
+        smtpPassword={smtpPassword}
+        setSmtpPassword={setSmtpPassword}
+        smtpSecure={smtpSecure}
+        setSmtpSecure={setSmtpSecure}
+        showPassword={showPassword}
+        setShowPassword={setShowPassword}
+        saving={saving}
+        onSave={handleSaveSMTP}
+      />
+      
       <TagManagerCard />
     </div>
+  );
+}
+
+// SMTP Settings Component
+function SMTPSettingsCard({ 
+  smtpHost, setSmtpHost, 
+  smtpPort, setSmtpPort, 
+  smtpUsername, setSmtpUsername, 
+  smtpPassword, setSmtpPassword, 
+  smtpSecure, setSmtpSecure,
+  showPassword, setShowPassword,
+  saving, onSave 
+}) {
+  return (
+    <Card className="mt-6 bg-[#1e2130] border-[#2e3245]">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-white">
+          <Server className="h-5 w-5 text-[#007bff]" />
+          SMTP Configuration
+        </CardTitle>
+        <CardDescription className="text-[#94a3b8]">
+          Configure your Mailgun or other SMTP provider for sending widget delivery emails
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label className="text-[#94a3b8]">SMTP Host</Label>
+            <Input 
+              value={smtpHost} 
+              onChange={(e) => setSmtpHost(e.target.value)} 
+              placeholder="smtp.mailgun.org"
+              className="bg-[#0f1117] border-[#2e3245] text-white" 
+            />
+          </div>
+          <div>
+            <Label className="text-[#94a3b8]">SMTP Port</Label>
+            <Input 
+              value={smtpPort} 
+              onChange={(e) => setSmtpPort(e.target.value)} 
+              placeholder="587"
+              className="bg-[#0f1117] border-[#2e3245] text-white" 
+            />
+          </div>
+        </div>
+        
+        <div>
+          <Label className="text-[#94a3b8]">SMTP Username</Label>
+          <Input 
+            value={smtpUsername} 
+            onChange={(e) => setSmtpUsername(e.target.value)} 
+            placeholder="postmaster@yourdomain.com"
+            className="bg-[#0f1117] border-[#2e3245] text-white" 
+          />
+        </div>
+        
+        <div>
+          <Label className="text-[#94a3b8]">SMTP Password / API Key</Label>
+          <div className="relative">
+            <Input 
+              type={showPassword ? "text" : "password"}
+              value={smtpPassword} 
+              onChange={(e) => setSmtpPassword(e.target.value)} 
+              placeholder="your-smtp-password-or-api-key"
+              className="bg-[#0f1117] border-[#2e3245] text-white pr-10" 
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-white"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="smtp_secure"
+            checked={smtpSecure}
+            onChange={(e) => setSmtpSecure(e.target.checked)}
+            className="w-5 h-5 rounded border-[#334155] bg-[#0f172a] text-[#4ade80]"
+          />
+          <Label htmlFor="smtp_secure" className="cursor-pointer text-[#e2e8f0]">
+            Use SSL/TLS (Port 465)
+          </Label>
+          <span className="text-[#64748b] text-xs">
+            (Uncheck for STARTTLS on port 587)
+          </span>
+        </div>
+        
+        <div className="bg-[#0f1117] rounded-lg p-4 border border-[#2e3245]">
+          <p className="text-[#64748b] text-xs mb-2">Mailgun Example:</p>
+          <ul className="text-[#94a3b8] text-xs space-y-1">
+            <li>• Host: smtp.mailgun.org</li>
+            <li>• Port: 587 (or 465 for SSL)</li>
+            <li>• Username: postmaster@yourdomain.com</li>
+            <li>• Password: Your Mailgun SMTP password</li>
+          </ul>
+        </div>
+        
+        <Button onClick={onSave} disabled={saving} className="bg-[#007bff]">
+          <Mail className="h-4 w-4 mr-2" />
+          {saving ? "Saving..." : "Save SMTP Settings"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

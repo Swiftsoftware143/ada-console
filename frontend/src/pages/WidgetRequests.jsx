@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Puzzle, Send, Clock, CheckCircle, AlertCircle, Code, Trash2, Edit2, Move } from "lucide-react";
+import { Puzzle, Send, Clock, CheckCircle, AlertCircle, Code, Trash2, Edit2, Move, Mail, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 import StatCard from "@/components/StatCard";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -13,10 +15,50 @@ const NOCODEBACKEND_API_KEY = '3a8c4c52bfafbe26fe25ca473f8a25bbea6c66448a6dfef2b
 const NOCODEBACKEND_BASE = 'https://openapi.nocodebackend.com';
 const INSTANCE = '54738_ada_swift';
 
-// Sendiio Config
-const SENDIIO_TOKEN = '7dc822e4ae6bc57f301ea4d82f0b8425f3a1ca60';
-const SENDIIO_SECRET = 'XCY6JwIZ3Q8MUsyFfbinu9DH2VtB7LWEPRqKcNe0P3TubKRxqkVMtIJjN9lsdreA671UypQgn0WzDXHL';
-const SENDIIO_BASE = 'https://sendiio.com/api/v1';
+// Default email templates (fallback)
+const DEFAULT_EMAIL_SUBJECT = "Your ADA Widget is Ready - {{business_name}}";
+
+const DEFAULT_EMAIL_HTML = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:#4ade80;color:white;padding:20px;text-align:center;border-radius:8px 8px 0 0;">
+    <h1>♿ ADA Swift</h1><p>Your Widget is Ready!</p>
+  </div>
+  <div style="background:#f8f9fa;padding:30px;border-radius:0 0 8px 8px;">
+    <p>Hi {{contact_name}},</p>
+    <p>Your ADA compliance widget for <strong>{{domain}}</strong> is ready!</p>
+    <p><strong>Plan:</strong> {{plan_tier}}<br>
+    <strong>Widget ID:</strong> {{widget_id}}</p>
+    <h3>Your Embed Code:</h3>
+    <div style="background:#1e293b;color:#4ade80;padding:15px;border-radius:4px;font-family:monospace;font-size:13px;overflow-x:auto;">{{{embed_code}}}</div>
+    <p><strong>Installation:</strong></p>
+    <ol><li>Copy the code above</li><li>Paste before the &lt;/body&gt; tag on your website</li><li>Save and publish</li></ol>
+    <p>Need help? Reply to this email.</p>
+    <p>Best,<br>{{agency_name}} Team</p>
+  </div>
+</body>
+</html>`;
+
+const DEFAULT_EMAIL_TEXT = `Hi {{contact_name}},
+
+Your ADA compliance widget for {{domain}} is ready!
+
+Plan: {{plan_tier}}
+Widget ID: {{widget_id}}
+
+EMBED CODE:
+{{embed_code}}
+
+Installation:
+1. Copy the code above
+2. Paste before </body> tag on your website
+3. Save and publish
+
+Need help? Reply to this email.
+
+Best,
+{{agency_name}} Team`;
 
 export default function WidgetRequests() {
   const [widgets, setWidgets] = useState([]);
@@ -27,6 +69,21 @@ export default function WidgetRequests() {
   const [editingWidget, setEditingWidget] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   
+  // Email settings from Supabase
+  const [emailSettings, setEmailSettings] = useState({
+    smtpHost: '',
+    smtpPort: '587',
+    smtpUsername: '',
+    smtpPassword: '',
+    smtpSecure: false,
+    fromEmail: 'hello@swiftimpactsolutions.com',
+    fromName: 'SwiftImpact Solutions',
+    subjectTemplate: DEFAULT_EMAIL_SUBJECT,
+    htmlTemplate: DEFAULT_EMAIL_HTML,
+    textTemplate: DEFAULT_EMAIL_TEXT,
+  });
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  
   const [formData, setFormData] = useState({
     business_name: '',
     contact_name: '',
@@ -35,6 +92,47 @@ export default function WidgetRequests() {
     plan_tier: 'basic',
     auto_deliver: true
   });
+
+  // Load email settings from Supabase
+  const loadEmailSettings = useCallback(async () => {
+    setSettingsLoading(true);
+    try {
+      const settingsKeys = [
+        'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_secure',
+        'email_from_address', 'email_from_name', 
+        'email_subject', 'email_template_html', 'email_template_text'
+      ];
+      
+      const { data, error } = await supabase
+        .from('settings')
+        .select('key, value')
+        .in('key', settingsKeys);
+      
+      if (error) throw error;
+      
+      const settingsMap = {};
+      data?.forEach(row => {
+        settingsMap[row.key] = row.value;
+      });
+      
+      setEmailSettings({
+        smtpHost: settingsMap.smtp_host || '',
+        smtpPort: settingsMap.smtp_port || '587',
+        smtpUsername: settingsMap.smtp_username || '',
+        smtpPassword: settingsMap.smtp_password || '',
+        smtpSecure: settingsMap.smtp_secure === 'true',
+        fromEmail: settingsMap.email_from_address || 'hello@swiftimpactsolutions.com',
+        fromName: settingsMap.email_from_name || 'SwiftImpact Solutions',
+        subjectTemplate: settingsMap.email_subject || DEFAULT_EMAIL_SUBJECT,
+        htmlTemplate: settingsMap.email_template_html || DEFAULT_EMAIL_HTML,
+        textTemplate: settingsMap.email_template_text || DEFAULT_EMAIL_TEXT,
+      });
+    } catch (e) {
+      console.error('Error loading email settings:', e);
+      toast.error('Failed to load email settings');
+    }
+    setSettingsLoading(false);
+  }, []);
 
   const loadWidgets = useCallback(async () => {
     setLoading(true);
@@ -60,7 +158,8 @@ export default function WidgetRequests() {
 
   useEffect(() => {
     loadWidgets();
-  }, [loadWidgets]);
+    loadEmailSettings();
+  }, [loadWidgets, loadEmailSettings]);
 
   const stats = useMemo(() => {
     const total = widgets.length;
@@ -169,6 +268,77 @@ export default function WidgetRequests() {
 <!-- End ADA Swift Widget -->`;
   };
 
+  // Replace template variables with actual values
+  const replaceTemplateVariables = (template, data) => {
+    return template
+      .replace(/\{\{business_name\}\}/g, data.business_name || '')
+      .replace(/\{\{contact_name\}\}/g, data.contact_name || '')
+      .replace(/\{\{contact_email\}\}/g, data.contact_email || '')
+      .replace(/\{\{domain\}\}/g, data.domain || '')
+      .replace(/\{\{plan_tier\}\}/g, (data.plan_tier || 'basic').toUpperCase())
+      .replace(/\{\{widget_id\}\}/g, data.widget_id || '')
+      .replace(/\{\{agency_name\}\}/g, data.agency_name || 'SwiftImpact Solutions')
+      .replace(/\{\{embed_code\}\}/g, data.embed_code || '')
+      .replace(/\{\{\{embed_code\}\}\}/g, (data.embed_code || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+  };
+
+  // Send email using configured SMTP settings
+  const sendEmail = async (widget, embedCode) => {
+    // Check if SMTP is configured
+    if (!emailSettings.smtpHost || !emailSettings.smtpUsername || !emailSettings.smtpPassword) {
+      console.warn('SMTP not configured, skipping email');
+      return { success: false, error: 'SMTP not configured' };
+    }
+
+    const templateData = {
+      business_name: widget.business_name,
+      contact_name: widget.contact_name,
+      contact_email: widget.contact_email,
+      domain: widget.domain,
+      plan_tier: widget.plan_tier,
+      widget_id: widget.widget_id,
+      embed_code: embedCode,
+      agency_name: emailSettings.fromName,
+    };
+
+    const subject = replaceTemplateVariables(emailSettings.subjectTemplate, templateData);
+    const htmlBody = replaceTemplateVariables(emailSettings.htmlTemplate, templateData);
+    const textBody = replaceTemplateVariables(emailSettings.textTemplate, templateData);
+
+    try {
+      // Use Netlify function to send email (to protect SMTP credentials)
+      const response = await fetch('/.netlify/functions/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: widget.contact_email,
+          from: emailSettings.fromEmail,
+          fromName: emailSettings.fromName,
+          subject: subject,
+          html: htmlBody,
+          text: textBody,
+          smtpConfig: {
+            host: emailSettings.smtpHost,
+            port: parseInt(emailSettings.smtpPort) || 587,
+            username: emailSettings.smtpUsername,
+            password: emailSettings.smtpPassword,
+            secure: emailSettings.smtpSecure,
+          }
+        })
+      });
+
+      if (response.ok) {
+        return { success: true };
+      } else {
+        const error = await response.text();
+        return { success: false, error };
+      }
+    } catch (error) {
+      console.error('Email send error:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   const deliverWidget = async (widget) => {
     try {
       const embedCode = generateEmbedCode(widget.widget_id, widget.domain, widget.plan_tier);
@@ -192,75 +362,13 @@ export default function WidgetRequests() {
       console.log('Response status:', response.status);
 
       if (response.ok) {
-        // Send email via Sendiio
-        try {
-          const emailHtml = `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-  <div style="background:#4ade80;color:white;padding:20px;text-align:center;border-radius:8px 8px 0 0;">
-    <h1>♿ ADA Swift</h1><p>Your Widget is Ready!</p>
-  </div>
-  <div style="background:#f8f9fa;padding:30px;border-radius:0 0 8px 8px;">
-    <p>Hi ${widget.contact_name},</p>
-    <p>Your ADA compliance widget for <strong>${widget.domain}</strong> is ready!</p>
-    <p><strong>Plan:</strong> ${(widget.plan_tier || 'basic').toUpperCase()}<br>
-    <strong>Widget ID:</strong> ${widget.widget_id}</p>
-    <h3>Your Embed Code:</h3>
-    <div style="background:#1e293b;color:#4ade80;padding:15px;border-radius:4px;font-family:monospace;font-size:13px;overflow-x:auto;">${embedCode.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-    <p><strong>Installation:</strong></p>
-    <ol><li>Copy the code above</li><li>Paste before the &lt;/body&gt; tag on your website</li><li>Save and publish</li></ol>
-    <p>Need help? Reply to this email.</p>
-    <p>Best,<br>SwiftImpact Solutions Team</p>
-  </div>
-</body>
-</html>`;
-
-          const emailText = `Hi ${widget.contact_name},
-
-Your ADA compliance widget for ${widget.domain} is ready!
-
-Plan: ${(widget.plan_tier || 'basic').toUpperCase()}
-Widget ID: ${widget.widget_id}
-
-EMBED CODE:
-${embedCode}
-
-Installation:
-1. Copy the code above
-2. Paste before </body> tag on your website
-3. Save and publish
-
-Need help? Reply to this email.
-
-Best,
-SwiftImpact Solutions Team`;
-
-          const emailResponse = await fetch(`${SENDIIO_BASE}/email/send`, {
-            method: 'POST',
-            headers: {
-              'token': SENDIIO_TOKEN,
-              'secret': SENDIIO_SECRET,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              to: widget.contact_email,
-              from: 'hello@swiftimpactsolutions.com',
-              from_name: 'SwiftImpact Solutions',
-              subject: `Your ADA Widget is Ready - ${widget.business_name}`,
-              html: emailHtml,
-              text: emailText
-            })
-          });
-
-          if (emailResponse.ok) {
-            setMessage({ type: 'success', text: 'Widget delivered and email sent!' });
-          } else {
-            setMessage({ type: 'warning', text: 'Widget delivered but email failed.' });
-          }
-        } catch (emailError) {
-          console.error('Email error:', emailError);
-          setMessage({ type: 'warning', text: 'Widget delivered but email failed.' });
+        // Send email using configured SMTP
+        const emailResult = await sendEmail(widget, embedCode);
+        
+        if (emailResult.success) {
+          setMessage({ type: 'success', text: 'Widget delivered and email sent!' });
+        } else {
+          setMessage({ type: 'warning', text: `Widget delivered but email failed: ${emailResult.error}` });
         }
         loadWidgets();
       } else {
@@ -390,9 +498,24 @@ SwiftImpact Solutions Team`;
     }
   };
 
+  const hasSMTPConfigured = emailSettings.smtpHost && emailSettings.smtpUsername && emailSettings.smtpPassword;
+
   return (
     <div className="space-y-6">
       <PageHeader title="Widget Requests" subtitle="Manage ADA widget requests and deliveries" />
+
+      {!hasSMTPConfigured && !settingsLoading && (
+        <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-yellow-400 mt-0.5" />
+          <div>
+            <p className="text-yellow-400 font-medium">SMTP Not Configured</p>
+            <p className="text-yellow-400/80 text-sm">
+              Email delivery is disabled. Go to <a href="/settings" className="underline">Settings</a> to configure SMTP, 
+              or <a href="/email-templates" className="underline">Email Templates</a> to customize emails.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Widgets" value={stats.total} icon={Puzzle} />
