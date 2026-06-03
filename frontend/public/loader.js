@@ -843,7 +843,15 @@
         doc.classList.toggle('aw-hide-images', enabled);
         break;
       case 'virtualKeyboard':
-        // Virtual keyboard implementation would go here
+        const vkb = shadow.getElementById('aw-vkb');
+        if (enabled) {
+          vkb.classList.add('visible');
+          // Focus on first input
+          const firstInput = document.querySelector('input, textarea');
+          if (firstInput) firstInput.focus();
+        } else {
+          vkb.classList.remove('visible');
+        }
         break;
     }
   }
@@ -899,6 +907,123 @@
     });
   }
 
+  /* ── INJECT GLOBAL STYLES ─────────────────────────────────────────────── */
+  function injectGlobalStyles() {
+    if (document.getElementById('aw-global-styles')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'aw-global-styles';
+    style.textContent = `
+      /* Highlight Titles */
+      .aw-highlight-titles h1,
+      .aw-highlight-titles h2,
+      .aw-highlight-titles h3,
+      .aw-highlight-titles h4,
+      .aw-highlight-titles h5,
+      .aw-highlight-titles h6 {
+        background-color: #ffeb3b !important;
+        color: #000 !important;
+        padding: 4px 8px !important;
+        border-radius: 4px !important;
+      }
+      
+      /* Highlight Links */
+      .aw-highlight-links a {
+        background-color: #ffeb3b !important;
+        color: #000 !important;
+        padding: 2px 4px !important;
+        border-radius: 2px !important;
+        text-decoration: underline !important;
+        font-weight: bold !important;
+      }
+      
+      /* Hide Images */
+      .aw-hide-images img,
+      .aw-hide-images picture,
+      .aw-hide-images figure,
+      .aw-hide-images [style*="background-image"] {
+        display: none !important;
+        visibility: hidden !important;
+      }
+      
+      /* Readable Font */
+      .aw-readable-font,
+      .aw-readable-font * {
+        font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif !important;
+        line-height: 1.6 !important;
+      }
+      
+      /* Dyslexia Friendly */
+      .aw-dyslexia,
+      .aw-dyslexia * {
+        font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif !important;
+        letter-spacing: 0.05em !important;
+        word-spacing: 0.1em !important;
+        line-height: 1.8 !important;
+      }
+      
+      /* Epilepsy Safe - Stop Animations */
+      .aw-epilepsy *,
+      .aw-epilepsy *::before,
+      .aw-epilepsy *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      
+      /* Cognitive - Simplified Interface */
+      .aw-cognitive * {
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+      }
+      
+      /* ADHD - Focus Mode */
+      .aw-adhd *:not(:focus):not(:hover) {
+        opacity: 0.7 !important;
+      }
+      .aw-adhd *:focus,
+      .aw-adhd *:hover {
+        opacity: 1 !important;
+        outline: 3px solid #007bff !important;
+      }
+      
+      /* Blindness - Screen Reader Optimized */
+      .aw-blindness {
+        background: #000 !important;
+        color: #fff !important;
+      }
+      
+      /* Visually Impaired - High Contrast */
+      .aw-vis-impaired {
+        filter: contrast(150%) !important;
+      }
+      
+      /* Contrast Modes */
+      .aw-contrast-dark {
+        filter: invert(1) hue-rotate(180deg) !important;
+        background: #000 !important;
+      }
+      .aw-contrast-light {
+        filter: contrast(120%) brightness(110%) !important;
+        background: #fff !important;
+      }
+      .aw-contrast-high {
+        filter: contrast(200%) !important;
+      }
+      
+      /* Cursor Styles */
+      .aw-cursor-black {
+        cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpolygon points='5,3 5,33 14,24 19,37 23,35 18,22 28,22' fill='%23000' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E") 5 3, auto !important;
+      }
+      .aw-cursor-white {
+        cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpolygon points='5,3 5,33 14,24 19,37 23,35 18,22 28,22' fill='%23fff' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E") 5 3, auto !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   /* ── START ────────────────────────────────────────────────────────────── */
+  injectGlobalStyles();
   loadWidget();
 })();
