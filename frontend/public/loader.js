@@ -1,7 +1,7 @@
 (function () {
   "use strict";
   
-  console.log('[ADA] Loader starting...');
+  console.log('[ADA] Loader v2.1 starting...');
 
   /* ── CONFIG ────────────────────────────────────────────────────────────── */
   const SUPABASE_URL     = "https://fmwnswiwhgiofagqbkws.supabase.co";
