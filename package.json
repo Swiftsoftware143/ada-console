@@ -1,0 +1,10 @@
+{
+  "name": "adaswift-root",
+  "version": "1.0.0",
+  "description": "ADASwift Console - Root package for Netlify functions",
+  "private": true,
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "nodemailer": "^6.9.7"
+  }
+}
