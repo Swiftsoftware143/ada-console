@@ -336,10 +336,6 @@
         padding:13px 16px 10px; border-bottom:1px solid #e8e8e8;
       }
       #aw-header h2 { font-size:16px; font-weight:700; color:#1a1a1a; }
-      #aw-plan-badge {
-        font-size:10px; padding:2px 8px; border-radius:10px;
-        background:${COLOR}20; color:${COLOR}; font-weight:600; text-transform:uppercase;
-      }
       #aw-close {
         background:none; border:none; cursor:pointer; padding:4px;
         border-radius:6px; color:#555; line-height:1; transition:background .15s;
@@ -463,16 +459,6 @@
       #aw-powered { font-size:10px; color:#aaa; text-align:right; line-height:1.4; flex-shrink:0; }
       #aw-powered a { color:${COLOR}; text-decoration:none; font-weight:600; }
       #aw-powered a:hover { text-decoration:underline; }
-      .aw-upgrade-banner {
-        background:linear-gradient(135deg,${COLOR}20,${COLOR}10);
-        border:1px solid ${COLOR}40;
-        border-radius:8px;
-        padding:10px;
-        margin-bottom:12px;
-        font-size:11px;
-        color:#444;
-      }
-      .aw-upgrade-banner strong { color:${COLOR}; }
     `;
 
     const CLOSE_IC = `<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>`;
@@ -532,7 +518,6 @@
   <div id="aw-header">
     <div>
       <h2>Accessibility</h2>
-      <span id="aw-plan-badge">${planTier}</span>
     </div>
     <button id="aw-close" aria-label="Close">${CLOSE_IC}</button>
   </div>
@@ -542,9 +527,6 @@
     <button class="aw-tab" data-tab="display">Display</button>
   </div>
   <div id="aw-body">
-    <div class="aw-upgrade-banner">
-      <strong>${planTier.charAt(0).toUpperCase() + planTier.slice(1)} Plan</strong> — ${pageCount} pages detected
-    </div>
     <div class="aw-pane active" id="pane-profiles">
       <div class="aw-section-label">Accessibility Profiles</div>
       <div class="aw-profiles">
