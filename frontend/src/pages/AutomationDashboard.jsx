@@ -662,24 +662,35 @@ export default function AutomationDashboard() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="p-4 bg-[#0f1117] rounded-lg border border-[#2e3245]">
-            <Label className="text-[#94a3b8] mb-2 block">Global Control / Stripe / Form Webhook</Label>
+            <Label className="text-[#94a3b8] mb-2 block">GrooveSell IPN Webhook</Label>
             <code className="block p-3 bg-[#1e2130] rounded text-[#007bff] text-sm break-all">
-              https://app.adaswift.com/api/webhook/widget-automation
+              https://app.adaswift.com/.netlify/functions/groove-ipn
             </code>
+            <p className="text-xs text-[#64748b] mt-2">Use in GrooveSell → Settings → IPN/Webhooks</p>
           </div>
-          <div className="flex gap-4 text-sm text-[#64748b]">
-            <div className="flex items-center gap-2">
-              <Tag className="h-4 w-4" />
-              <span>Tag: <code className="text-[#007bff]">ada-widget-request</code></span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              <span>Stripe: Payment webhook</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <FormInput className="h-4 w-4" />
-              <span>Form: POST to webhook URL</span>
-            </div>
+
+          <div className="p-4 bg-[#0f1117] rounded-lg border border-[#2e3245]">
+            <Label className="text-[#94a3b8] mb-2 block">Pabbly Connect / Global Control Webhook</Label>
+            <code className="block p-3 bg-[#1e2130] rounded text-[#007bff] text-sm break-all">
+              https://app.adaswift.com/.netlify/functions/globalcontrol-webhook
+            </code>
+            <p className="text-xs text-[#64748b] mt-2">Use in Pabbly → Action → POST Request. Trigger tag: ada-widget-request</p>
+          </div>
+
+          <div className="p-4 bg-[#0f1117] rounded-lg border border-[#2e3245]">
+            <Label className="text-[#94a3b8] mb-2 block">Stripe Webhook</Label>
+            <code className="block p-3 bg-[#1e2130] rounded text-[#007bff] text-sm break-all">
+              https://app.adaswift.com/.netlify/functions/stripe-webhook
+            </code>
+            <p className="text-xs text-[#64748b] mt-2">Use in Stripe → Developers → Webhooks. Event: checkout.session.completed</p>
+          </div>
+
+          <div className="p-4 bg-[#0f1117] rounded-lg border border-[#2e3245]">
+            <Label className="text-[#94a3b8] mb-2 block">Generic Form Webhook</Label>
+            <code className="block p-3 bg-[#1e2130] rounded text-[#007bff] text-sm break-all">
+              https://app.adaswift.com/.netlify/functions/widget-automation
+            </code>
+            <p className="text-xs text-[#64748b] mt-2">For custom forms. Required fields: contact_email, business_name, domain</p>
           </div>
         </CardContent>
       </Card>
