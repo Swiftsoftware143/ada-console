@@ -53,9 +53,11 @@ export const preloadCdnDomain = async () => {
   await getCdnDomain();
 };
 
-export const generateEmbedCode = (domain, cdnDomain = "https://adaswift.netlify.app") => {
+export const generateEmbedCode = (domain, cdnDomain) => {
   const d = cleanDomain(domain) || "YOUR_DOMAIN_HERE";
-  return `<script>!function(){var s=document.createElement("script");s.src="${cdnDomain}/loader.js";s.setAttribute("data-domain","${d}");s.async=!0;document.body.appendChild(s)}();</script>`;
+  // Use provided CDN domain, or fall back to cached, then default
+  const cdn = cdnDomain || getCachedCdnDomain();
+  return `<script>!function(){var s=document.createElement("script");s.src="${cdn}/loader.js?v=2";s.setAttribute("data-domain","${d}");s.async=!0;document.body.appendChild(s)}();</script>`;
 };
 
 export const formatDate = (iso) => {

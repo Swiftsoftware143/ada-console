@@ -63,20 +63,55 @@ export default function Settings() {
   const handleSaveCdnDomain = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase.from("settings").upsert({ key: "cdn_domain", value: cdnDomain, updated_at: new Date().toISOString() });
-      if (error) throw error;
+      // Try update first
+      const { error: updateError } = await supabase
+        .from("settings")
+        .update({ value: cdnDomain, updated_at: new Date().toISOString() })
+        .eq("key", "cdn_domain");
+      
+      if (updateError) {
+        console.log("Update failed, trying insert:", updateError);
+        // If update fails (no row exists), insert
+        const { error: insertError } = await supabase
+          .from("settings")
+          .insert({ key: "cdn_domain", value: cdnDomain, updated_at: new Date().toISOString() });
+        if (insertError) throw insertError;
+      }
+      
       toast.success("CDN domain updated");
-    } catch (e) { toast.error("Failed to save CDN domain"); }
+    } catch (e) { 
+      console.error("Save error:", e);
+      toast.error("Failed to save CDN domain: " + e.message); 
+    }
     setSaving(false);
+  };
+
+  const saveSetting = async (key, value) => {
+    // Try update first
+    const { error: updateError } = await supabase
+      .from("settings")
+      .update({ value: value, updated_at: new Date().toISOString() })
+      .eq("key", key);
+    
+    if (updateError) {
+      // If update fails (no row exists), insert
+      const { error: insertError } = await supabase
+        .from("settings")
+        .insert({ key: key, value: value, updated_at: new Date().toISOString() });
+      if (insertError) throw insertError;
+    }
   };
 
   const handleSaveAgencyDefaults = async () => {
     setSaving(true);
     try {
-      await supabase.from("settings").upsert({ key: "agency_name", value: agencyName, updated_at: new Date().toISOString() });
-      await supabase.from("settings").upsert({ key: "cta_url", value: ctaUrl, updated_at: new Date().toISOString() });
+      await saveSetting("agency_name", agencyName);
+      await saveSetting("cta_url", ctaUrl);
       toast.success("Agency defaults saved");
-    } catch (e) { toast.error("Failed to save agency defaults"); }
+    } catch (e) { 
+      console.error("Save error:", e);
+      toast.error("Failed to save agency defaults: " + e.message); 
+    }
     setSaving(false);
   };
 
@@ -323,15 +358,28 @@ function TagManagerCard() {
   const saveTags = async (newTags) => {
     setSaving(true);
     try {
-      const { error } = await supabase
+      // Try update first, then insert if not exists
+      const { error: updateError } = await supabase
         .from("settings")
-        .upsert({ 
-          key: "tags", 
+        .update({ 
           value: newTags.join(", "),
           updated_at: new Date().toISOString() 
-        });
+        })
+        .eq("key", "tags");
       
-      if (error) throw error;
+      if (updateError) {
+        console.log("Update failed, trying insert:", updateError);
+        // If update fails, try insert
+        const { error: insertError } = await supabase
+          .from("settings")
+          .insert({ 
+            key: "tags", 
+            value: newTags.join(", "),
+            updated_at: new Date().toISOString() 
+          });
+        if (insertError) throw insertError;
+      }
+      
       setTags(newTags);
       toast.success("Tags saved");
     } catch (e) {
@@ -344,7 +392,9 @@ function TagManagerCard() {
   const addTag = () => {
     if (!newTag.trim()) return;
     const normalizedTag = newTag.trim();
-    if (tags.includes(normalizedTag)) {
+    // Case-insensitive duplicate check
+    const tagExists = tags.some(t => t.toLowerCase() === normalizedTag.toLowerCase());
+    if (tagExists) {
       toast.error("Tag already exists");
       return;
     }

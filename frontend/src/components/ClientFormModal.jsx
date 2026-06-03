@@ -26,6 +26,8 @@ import { Loader2 } from "lucide-react";
 const initialState = {
   name: "",
   domain: "",
+  contact_email: "",
+  contact_name: "",
   plan_tier: "basic",
   tags: [],
   location: "",
@@ -63,6 +65,61 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
     }
   };
 
+  // Helper to add new tags to the global settings
+  const addTagsToSettings = async (newTags) => {
+    if (newTags.length === 0) return;
+    
+    try {
+      // Get current tags from settings
+      const { data: settingsData } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "tags")
+        .maybeSingle();
+      
+      let currentTags = [];
+      if (settingsData?.value) {
+        currentTags = typeof settingsData.value === 'string'
+          ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
+          : Array.isArray(settingsData.value) ? settingsData.value : [];
+      }
+      
+      // Add new tags that don't already exist (case-insensitive)
+      const tagsToAdd = newTags.filter(tag => 
+        !currentTags.some(t => t.toLowerCase() === tag.toLowerCase())
+      );
+      if (tagsToAdd.length > 0) {
+        const updatedTags = [...currentTags, ...tagsToAdd];
+        // Try update first, then insert if not exists
+        const { error: updateError } = await supabase
+          .from("settings")
+          .update({ 
+            value: updatedTags.join(", "),
+            updated_at: new Date().toISOString() 
+          })
+          .eq("key", "tags");
+        
+        if (updateError) {
+          console.log("Update failed, trying insert:", updateError);
+          // If update fails, try insert
+          const { error: insertError } = await supabase
+            .from("settings")
+            .insert({ 
+              key: "tags", 
+              value: updatedTags.join(", "),
+              updated_at: new Date().toISOString() 
+            });
+          if (insertError) {
+            console.error("Insert also failed:", insertError);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error adding tags to settings:", e);
+      // Don't fail the client creation if tag sync fails
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) {
@@ -73,8 +130,23 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
       toast.error("Domain is required");
       return;
     }
+    if (!form.contact_email.trim()) {
+      toast.error("Contact email is required for scan reports and widget delivery");
+      return;
+    }
 
     setSaving(true);
+    
+    // Find tags that are new (not in availableTags) - case-insensitive
+    const newTags = form.tags.filter(tag => 
+      !availableTags.some(t => t.toLowerCase() === tag.toLowerCase())
+    );
+    
+    // Add new tags to settings
+    if (newTags.length > 0) {
+      await addTagsToSettings(newTags);
+    }
+    
     // Store tags as comma-separated string in tags field
     const tagsString = form.tags.length > 0 
       ? form.tags.join(', ')
@@ -83,6 +155,8 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
     const payload = {
       name: form.name.trim(),
       domain: cleanDomain(form.domain),
+      contact_email: form.contact_email.trim() || null,
+      contact_name: form.contact_name.trim() || null,
       plan_tier: form.plan_tier,
       tags: tagsString,
       location: form.location.trim() || null,
@@ -169,6 +243,35 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
             </p>
           </div>
 
+          {/* Contact Info */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="client-contact-name" className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
+                Contact Name
+              </Label>
+              <Input
+                id="client-contact-name"
+                value={form.contact_name}
+                onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
+                placeholder="John Doe"
+                className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="client-contact-email" className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
+                Contact Email *
+              </Label>
+              <Input
+                id="client-contact-email"
+                type="email"
+                value={form.contact_email}
+                onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
+                placeholder="john@example.com"
+                className="bg-[#0f1117] border-[#2e3245] text-white placeholder:text-[#64748b] focus-visible:ring-[#007bff] focus-visible:border-transparent"
+              />
+            </div>
+          </div>
+
           {/* Tags Section */}
           <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-[0.15em] text-[#64748b] font-bold">
@@ -192,9 +295,9 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
               ))}
             </div>
             
-            {/* Quick-add from existing tags */}
+            {/* Quick-add from existing tags - case-insensitive filter */}
             <div className="flex flex-wrap gap-1 mb-2">
-              {availableTags.filter(t => !form.tags.includes(t)).slice(0, 8).map((tag) => (
+              {availableTags.filter(t => !form.tags.some(ft => ft.toLowerCase() === t.toLowerCase())).slice(0, 8).map((tag) => (
                 <button
                   key={tag}
                   type="button"
@@ -214,9 +317,14 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
-                      setForm({ ...form, tags: [...form.tags, tagInput.trim()] });
+                    const trimmedTag = tagInput.trim();
+                    // Case-insensitive duplicate check
+                    const tagExists = form.tags.some(t => t.toLowerCase() === trimmedTag.toLowerCase());
+                    if (trimmedTag && !tagExists) {
+                      setForm({ ...form, tags: [...form.tags, trimmedTag] });
                       setTagInput("");
+                    } else if (tagExists) {
+                      toast.error("Tag already added");
                     }
                   }
                 }}
@@ -227,9 +335,14 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
-                    setForm({ ...form, tags: [...form.tags, tagInput.trim()] });
+                  const trimmedTag = tagInput.trim();
+                  // Case-insensitive duplicate check
+                  const tagExists = form.tags.some(t => t.toLowerCase() === trimmedTag.toLowerCase());
+                  if (trimmedTag && !tagExists) {
+                    setForm({ ...form, tags: [...form.tags, trimmedTag] });
                     setTagInput("");
+                  } else if (tagExists) {
+                    toast.error("Tag already added");
                   }
                 }}
                 className="bg-transparent border-[#2e3245] text-white hover:bg-[#1a1d27]"
@@ -270,7 +383,9 @@ export default function ClientFormModal({ open, onOpenChange, onCreated, isPerso
               </SelectTrigger>
               <SelectContent className="bg-[#1e2130] border-[#2e3245] text-white">
                 <SelectItem value="basic">Basic</SelectItem>
+                <SelectItem value="starter">Starter</SelectItem>
                 <SelectItem value="pro">Pro</SelectItem>
+                <SelectItem value="growth">Growth</SelectItem>
                 <SelectItem value="enterprise">Enterprise</SelectItem>
               </SelectContent>
             </Select>

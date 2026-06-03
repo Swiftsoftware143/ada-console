@@ -8,7 +8,7 @@ import {
   DEFAULT_PROFILES,
   DEFAULT_FEATURES,
 } from "@/lib/supabase";
-import { cleanDomain, generateEmbedCode } from "@/lib/helpers";
+import { cleanDomain, generateEmbedCode, getCdnDomain } from "@/lib/helpers";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,12 @@ export default function ClientDetail({ isPersonal = false }) {
   const [tagInput, setTagInput] = useState("");
   const [profileFilter, setProfileFilter] = useState("");
   const [featureFilter, setFeatureFilter] = useState("");
+  const [cdnDomain, setCdnDomain] = useState("https://adaswift.netlify.app");
+
+  const loadCdnDomain = useCallback(async () => {
+    const domain = await getCdnDomain();
+    setCdnDomain(domain);
+  }, []);
 
   const loadTags = useCallback(async () => {
     try {
@@ -97,12 +103,13 @@ export default function ClientDetail({ isPersonal = false }) {
       }
       setClient(hydrate(data));
       loadTags();
+      loadCdnDomain();
       setLoading(false);
     })();
     return () => {
       alive = false;
     };
-  }, [id, navigate, isPersonal, loadTags]);
+  }, [id, navigate, isPersonal, loadTags, loadCdnDomain]);
 
   const update = useCallback(
     (patch) => setClient((c) => ({ ...c, ...patch })),
@@ -125,11 +132,87 @@ export default function ClientDetail({ isPersonal = false }) {
     []
   );
 
+  // Helper to get current tags array
+  const getCurrentTags = useCallback(() => {
+    if (!client?.tags) return [];
+    if (Array.isArray(client.tags)) return client.tags;
+    if (typeof client.tags === 'string') {
+      return client.tags.split(',').map(t => t.trim()).filter(Boolean);
+    }
+    return [];
+  }, [client?.tags]);
+
   const handleSave = useCallback(async () => {
     if (!client) return;
     setSaving(true);
     try {
       console.log("Saving client:", id, "Current tags:", client.tags);
+      
+      // Get current tags array
+      const currentTags = getCurrentTags();
+      
+      // Find any new tags that aren't in the Tag Manager yet (case-insensitive)
+      const newTags = currentTags.filter(tag => 
+        !availableTags.some(t => t.toLowerCase() === tag.toLowerCase())
+      );
+      
+      // Sync new tags to Tag Manager
+      if (newTags.length > 0) {
+        console.log("Syncing new tags to Tag Manager:", newTags);
+        try {
+          const { data: settingsData } = await supabase
+            .from("settings")
+            .select("value")
+            .eq("key", "tags")
+            .maybeSingle();
+          
+          let currentSettingsTags = [];
+          if (settingsData?.value) {
+            currentSettingsTags = typeof settingsData.value === 'string'
+              ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
+              : Array.isArray(settingsData.value) ? settingsData.value : [];
+          }
+          
+          // Case-insensitive check against settings tags
+          const tagsToAdd = newTags.filter(tag => 
+            !currentSettingsTags.some(t => t.toLowerCase() === tag.toLowerCase())
+          );
+          
+          if (tagsToAdd.length > 0) {
+            const updatedTags = [...currentSettingsTags, ...tagsToAdd];
+            // Try update first, then insert if not exists
+            const { error: updateError } = await supabase
+              .from("settings")
+              .update({ 
+                value: updatedTags.join(", "),
+                updated_at: new Date().toISOString() 
+              })
+              .eq("key", "tags");
+            
+            if (updateError) {
+              console.log("Update failed, trying insert:", updateError);
+              // If update fails, try insert
+              const { error: insertError } = await supabase
+                .from("settings")
+                .insert({ 
+                  key: "tags", 
+                  value: updatedTags.join(", "),
+                  updated_at: new Date().toISOString() 
+                });
+              if (insertError) {
+                console.error("Insert also failed:", insertError);
+              }
+            }
+            console.log("Added new tags to Tag Manager:", tagsToAdd);
+          }
+          
+          // Update local available tags
+          setAvailableTags(prev => [...prev, ...newTags].sort());
+        } catch (e) {
+          console.error("Error syncing tags to Tag Manager:", e);
+          // Don't fail the save if tag sync fails
+        }
+      }
       
       // Build update payload - match database schema exactly
       const updateData = {};
@@ -137,6 +220,8 @@ export default function ClientDetail({ isPersonal = false }) {
       // Only include fields that are actually set
       if (client.name) updateData.name = client.name;
       if (client.domain) updateData.domain = cleanDomain(client.domain);
+      if (client.contact_email !== undefined) updateData.contact_email = client.contact_email || null;
+      if (client.contact_name !== undefined) updateData.contact_name = client.contact_name || null;
       if (client.plan_tier) updateData.plan_tier = client.plan_tier;
       
       // Handle tags - database expects array
@@ -150,6 +235,12 @@ export default function ClientDetail({ isPersonal = false }) {
       if (client.location !== undefined) updateData.location = client.location || null;
       if (client.notes !== undefined) updateData.notes = client.notes || null;
       if (client.active !== undefined) updateData.active = Boolean(client.active);
+      
+      // Include widget settings
+      if (client.widget_position !== undefined) updateData.widget_position = client.widget_position;
+      if (client.primary_color !== undefined) updateData.primary_color = client.primary_color;
+      if (client.enabled_profiles !== undefined) updateData.enabled_profiles = client.enabled_profiles;
+      if (client.enabled_features !== undefined) updateData.enabled_features = client.enabled_features;
       
       console.log("Update payload:", updateData);
       
@@ -197,7 +288,7 @@ export default function ClientDetail({ isPersonal = false }) {
       toast.error("Save failed: " + err.message);
     }
     setSaving(false);
-  }, [client, id, isPersonal]);
+  }, [client, id, isPersonal, availableTags, getCurrentTags]);
 
   const handleDelete = useCallback(async () => {
     const { error } = await supabase
@@ -229,8 +320,8 @@ export default function ClientDetail({ isPersonal = false }) {
   }, [client, id, isPersonal, update]);
 
   const embedCode = useMemo(
-    () => generateEmbedCode(client?.domain),
-    [client?.domain]
+    () => generateEmbedCode(client?.domain, cdnDomain),
+    [client?.domain, cdnDomain]
   );
 
   if (loading || !client) {
@@ -242,42 +333,56 @@ export default function ClientDetail({ isPersonal = false }) {
     );
   }
 
-  // Helper to get current tags array
-  const getCurrentTags = () => {
-    if (!client.tags) return [];
-    if (Array.isArray(client.tags)) return client.tags;
-    if (typeof client.tags === 'string') {
-      return client.tags.split(',').map(t => t.trim()).filter(Boolean);
-    }
-    return [];
-  };
-
   // Helper to add a tag
   const addTag = async (tag) => {
     const current = getCurrentTags();
-    if (!current.includes(tag)) {
-      // Store as array for database
-      const newTagsArray = [...current, tag];
-      update({ tags: newTagsArray });
+    // Case-insensitive check for duplicates
+    const tagLower = tag.toLowerCase();
+    const tagExists = current.some(t => t.toLowerCase() === tagLower);
+    
+    if (tagExists) {
+      toast.error(`Tag "${tag}" is already assigned`);
+      return;
+    }
+    
+    // Store as array for database
+    const newTagsArray = [...current, tag];
+    update({ tags: newTagsArray });
+    
+    // If this is a new tag not in Tag Manager, add it
+    const tagNotInManager = !availableTags.some(t => t.toLowerCase() === tagLower);
+    if (tagNotInManager) {
+      const newTags = [...availableTags, tag].sort();
+      setAvailableTags(newTags);
       
-      // If this is a new tag not in Tag Manager, add it
-      if (!availableTags.includes(tag)) {
-        const newTags = [...availableTags, tag].sort();
-        setAvailableTags(newTags);
+      // Save to Tag Manager (settings) - store as comma-separated string
+      try {
+        // Try update first, then insert if not exists
+        const { error: updateError } = await supabase
+          .from("settings")
+          .update({ 
+            value: newTags.join(", "),
+            updated_at: new Date().toISOString() 
+          })
+          .eq("key", "tags");
         
-        // Save to Tag Manager (settings) - store as comma-separated string
-        try {
-          await supabase
+        if (updateError) {
+          console.log("Update failed, trying insert:", updateError);
+          // If update fails, try insert
+          const { error: insertError } = await supabase
             .from("settings")
-            .upsert({ 
+            .insert({ 
               key: "tags", 
               value: newTags.join(", "),
               updated_at: new Date().toISOString() 
             });
-          console.log("Added new tag to Tag Manager:", tag);
-        } catch (e) {
-          console.error("Failed to save tag to Tag Manager:", e);
+          if (insertError) {
+            console.error("Insert also failed:", insertError);
+          }
         }
+        console.log("Added new tag to Tag Manager:", tag);
+      } catch (e) {
+        console.error("Failed to save tag to Tag Manager:", e);
       }
     }
   };
@@ -345,7 +450,31 @@ export default function ClientDetail({ isPersonal = false }) {
                 Stored cleanly on save (no https://, www., or trailing /).
               </p>
             </Field>
-            
+
+            {/* Contact Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Contact Name">
+                <Input
+                  value={client.contact_name || ''}
+                  onChange={(e) => update({ contact_name: e.target.value })}
+                  placeholder="John Doe"
+                  className="bg-[#0f1117] border-[#2e3245] text-white focus-visible:ring-[#007bff] focus-visible:border-transparent"
+                />
+              </Field>
+              <Field label="Contact Email">
+                <Input
+                  type="email"
+                  value={client.contact_email || ''}
+                  onChange={(e) => update({ contact_email: e.target.value })}
+                  placeholder="john@example.com"
+                  className="bg-[#0f1117] border-[#2e3245] text-white focus-visible:ring-[#007bff] focus-visible:border-transparent"
+                />
+                <p className="text-xs text-[#64748b] mt-1.5">
+                  Used for scan reports and widget delivery.
+                </p>
+              </Field>
+            </div>
+
             {/* Tags Field */}
             <Field label="Tags">
               {/* Current tags display */}
@@ -385,11 +514,14 @@ export default function ClientDetail({ isPersonal = false }) {
                 </SelectTrigger>
                 <SelectContent className="bg-[#1e2130] border-[#2e3245] max-h-[300px]">
                   <SelectItem value="__placeholder__" disabled>Select a tag...</SelectItem>
-                  {availableTags.map((tag) => (
-                    <SelectItem key={tag} value={tag}>
-                      {getCurrentTags().includes(tag) ? `✓ ${tag} (already assigned)` : tag}
-                    </SelectItem>
-                  ))}
+                  {availableTags.map((tag) => {
+                    const isAssigned = getCurrentTags().some(t => t.toLowerCase() === tag.toLowerCase());
+                    return (
+                      <SelectItem key={tag} value={tag}>
+                        {isAssigned ? `✓ ${tag} (already assigned)` : tag}
+                      </SelectItem>
+                    );
+                  })}
                   {availableTags.length === 0 && (
                     <SelectItem value="__empty__" disabled>No tags in Tag Manager</SelectItem>
                   )}

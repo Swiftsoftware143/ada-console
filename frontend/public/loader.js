@@ -1,15 +1,19 @@
 (function () {
   "use strict";
   
-  console.log('[ADA] Loader starting...');
+  console.log('[ADA] Loader v2.1 starting...');
 
   /* ── CONFIG ────────────────────────────────────────────────────────────── */
-  const SUPABASE_URL     = "https://fmwnswiwhgiofagqbkws.supabase.co"; // ← YOUR SUPABASE URL
-  const SUPABASE_ANON    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtd25zd2l3aGdpb2ZhZ3Fia3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MzYwMDcsImV4cCI6MjA5NDExMjAwN30.ZlhvVGjfisF8P7tLCzCheHhgKwJjBT3S9E5gALv8ugU";               // ← YOUR ANON KEY
+  const SUPABASE_URL     = "https://fmwnswiwhgiofagqbkws.supabase.co";
+  const SUPABASE_ANON    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtd25zd2l3aGdpb2ZhZ3Fia3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MzYwMDcsImV4cCI6MjA5NDExMjAwN30.ZlhvVGjfisF8P7tLCzCheHhgKwJjBT3S9E5gALv8ugU";
   const CURRENT_DOMAIN   = (document.currentScript && document.currentScript.getAttribute("data-domain"))
                            || window.location.hostname.replace(/^www\./, "");
   
+  // Extract root domain for subdomain matching
+  const ROOT_DOMAIN = CURRENT_DOMAIN.split('.').slice(-2).join('.');
+  
   console.log('[ADA] Domain detected:', CURRENT_DOMAIN);
+  console.log('[ADA] Root domain:', ROOT_DOMAIN);
   /* ─────────────────────────────────────────────────────────────────────── */
 
   if (!CURRENT_DOMAIN) {
@@ -17,51 +21,238 @@
     return;
   }
 
-  /* ── FETCH CLIENT CONFIG FROM SUPABASE ─────────────────────────────────── */
-  // Try clients table first, then personal_websites
-  fetch(`${SUPABASE_URL}/rest/v1/clients?domain=eq.${encodeURIComponent(CURRENT_DOMAIN)}&select=*&limit=1`, {
-    headers: {
-      "apikey":        SUPABASE_ANON,
-      "Authorization": `Bearer ${SUPABASE_ANON}`,
-      "Content-Type":  "application/json"
-    }
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data && data.length) {
-      const client = data[0];
-      if (!client.active) return;        /* Widget is off — do nothing */
-      injectWidget(client);
-    } else {
-      // Try personal_websites table
-      return fetch(`${SUPABASE_URL}/rest/v1/personal_websites?domain=eq.${encodeURIComponent(CURRENT_DOMAIN)}&select=*&limit=1`, {
-        headers: {
-          "apikey":        SUPABASE_ANON,
-          "Authorization": `Bearer ${SUPABASE_ANON}`,
-          "Content-Type":  "application/json"
+  // Count pages on the current site
+  async function countPages() {
+    try {
+      // Method 1: Count unique links on the current page
+      const links = Array.from(document.querySelectorAll('a[href]'));
+      const internalLinks = links.filter(link => {
+        try {
+          const url = new URL(link.href);
+          return url.hostname === window.location.hostname;
+        } catch {
+          return false;
         }
-      }).then(r => r.json());
+      });
+      
+      // Get unique paths
+      const uniquePaths = new Set(internalLinks.map(link => {
+        try {
+          return new URL(link.href).pathname;
+        } catch {
+          return link.pathname;
+        }
+      }));
+      
+      // Estimate total pages (internal links + current page)
+      const estimatedPages = uniquePaths.size + 1;
+      
+      console.log('[ADA] Estimated pages:', estimatedPages);
+      return estimatedPages;
+    } catch (e) {
+      console.log('[ADA] Could not count pages:', e);
+      return 1; // Default to 1 page
     }
-  })
-  .then(data => {
-    console.log('[ADA] Client data:', data);
-    if (data && data.length) {
-      const client = data[0];
-      console.log('[ADA] Client found:', client.name, 'Active:', client.active);
+  }
+
+  // Determine plan based on page count and admin settings
+  function determinePlan(pageCount, planSettings) {
+    const settings = planSettings || {
+      basic_max: 5,
+      starter_max: 25,
+      pro_max: 100,
+      growth_max: 500
+    };
+    
+    if (pageCount <= settings.basic_max) return 'basic';
+    if (pageCount <= settings.starter_max) return 'starter';
+    if (pageCount <= settings.pro_max) return 'pro';
+    if (pageCount <= settings.growth_max) return 'growth';
+    return 'enterprise';
+  }
+
+  /* ── FETCH CLIENT CONFIG FROM SUPABASE ─────────────────────────────────── */
+  async function loadWidget() {
+    // Build domain filter - try exact domain match first, then root domain
+    const domainFilter = `domain=eq.${encodeURIComponent(CURRENT_DOMAIN)}`;
+    const rootDomainFilter = `domain=eq.${encodeURIComponent(ROOT_DOMAIN)}`;
+    
+    try {
+      console.log('[ADA] Fetching client for domain:', CURRENT_DOMAIN);
+      
+      // Fetch client config - try exact domain first
+      let clientRes = await fetch(`${SUPABASE_URL}/rest/v1/clients?${domainFilter}&select=*&limit=1`, {
+        headers: {
+          "apikey": SUPABASE_ANON,
+          "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json"
+        }
+      });
+      
+      if (!clientRes.ok) {
+        console.log('[ADA] Client query failed, status:', clientRes.status);
+      }
+      
+      let clientData = await clientRes.json();
+      
+      // Check if response is an error
+      if (clientData && (clientData.error || clientData.message || clientData.code)) {
+        console.error('[ADA] Supabase error:', clientData);
+        clientData = []; // Reset to empty array on error
+      }
+      
+      console.log('[ADA] Client data:', clientData);
+      
+      // If not found, try root domain
+      if (!clientData || clientData.length === 0) {
+        console.log('[ADA] Trying root domain:', ROOT_DOMAIN);
+        clientRes = await fetch(`${SUPABASE_URL}/rest/v1/clients?${rootDomainFilter}&select=*&limit=1`, {
+          headers: {
+            "apikey": SUPABASE_ANON,
+            "Authorization": `Bearer ${SUPABASE_ANON}`,
+            "Content-Type": "application/json"
+          }
+        });
+        clientData = await clientRes.json();
+      }
+      
+      // If not found in clients, try personal_websites
+      if (!clientData || clientData.length === 0) {
+        console.log('[ADA] Trying personal_websites table...');
+        let personalRes = await fetch(`${SUPABASE_URL}/rest/v1/personal_websites?${domainFilter}&select=*&limit=1`, {
+          headers: {
+            "apikey": SUPABASE_ANON,
+            "Authorization": `Bearer ${SUPABASE_ANON}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (!personalRes.ok) {
+          console.log('[ADA] Personal websites query failed, status:', personalRes.status);
+        }
+        
+        clientData = await personalRes.json();
+        
+        // Check if response is an error
+        if (clientData && (clientData.error || clientData.message || clientData.code)) {
+          console.error('[ADA] Supabase error (personal):', clientData);
+          clientData = [];
+        }
+        
+        // Try root domain for personal_websites too
+        if (!clientData || clientData.length === 0) {
+          personalRes = await fetch(`${SUPABASE_URL}/rest/v1/personal_websites?${rootDomainFilter}&select=*&limit=1`, {
+            headers: {
+              "apikey": SUPABASE_ANON,
+              "Authorization": `Bearer ${SUPABASE_ANON}`,
+              "Content-Type": "application/json"
+            }
+          });
+          clientData = await personalRes.json();
+        }
+      }
+      
+      if (!clientData || clientData.length === 0) {
+        console.log('[ADA] No client found for domain:', CURRENT_DOMAIN);
+        return;
+      }
+      
+      // Handle case where response might be an error object
+      if (clientData.error || clientData.message) {
+        console.error('[ADA] API error:', clientData);
+        return;
+      }
+      
+      const client = clientData[0];
+      if (!client) {
+        console.error('[ADA] Client data is empty');
+        return;
+      }
+      
+      console.log('[ADA] Client found:', client.name || 'Unknown', 'Active:', client.active);
+      
       if (!client.active) {
         console.log('[ADA] Client inactive, not loading widget');
         return;
       }
-      injectWidget(client);
-    } else {
-      console.log('[ADA] No client found for domain:', CURRENT_DOMAIN);
+      
+      // Fetch plan settings from admin
+      let planSettings = null;
+      try {
+        const settingsRes = await fetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.plan_config&select=value&limit=1`, {
+          headers: {
+            "apikey": SUPABASE_ANON,
+            "Authorization": `Bearer ${SUPABASE_ANON}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          planSettings = settingsData?.[0]?.value ? JSON.parse(settingsData[0].value) : null;
+        }
+      } catch (e) {
+        console.log('[ADA] Could not load plan settings, using defaults');
+      }
+      
+      // Count pages and determine dynamic plan
+      const pageCount = await countPages();
+      const detectedPlan = determinePlan(pageCount, planSettings);
+      
+      console.log('[ADA] Pages detected:', pageCount, 'Plan:', detectedPlan);
+      
+      // Use detected plan or client's assigned plan (whichever is higher)
+      const finalPlan = getHigherPlan(client.plan_tier, detectedPlan);
+      
+      // Update client record with detected plan (only if personal_websites table)
+      if (client.table === 'personal_websites') {
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/personal_websites?id=eq.${client.id}`, {
+            method: 'PATCH',
+            headers: {
+              "apikey": SUPABASE_ANON,
+              "Authorization": `Bearer ${SUPABASE_ANON}`,
+              "Content-Type": "application/json",
+              "Prefer": "return=minimal"
+            },
+            body: JSON.stringify({
+              detected_plan: detectedPlan,
+              page_count: pageCount,
+              detected_at: new Date().toISOString()
+            })
+          });
+        } catch (e) {
+          console.log('[ADA] Could not update client record');
+        }
+      }
+      
+      // Inject widget with final plan
+      injectWidget(client, finalPlan, pageCount);
+      
+    } catch (err) {
+      console.error('[ADA] Error loading widget:', err);
     }
-  })
-  .catch(() => {}); /* Silent fail — never break the client's site */
+  }
+  
+  // Plan hierarchy for comparison
+  const PLAN_HIERARCHY = {
+    'basic': 1,
+    'starter': 2,
+    'pro': 3,
+    'growth': 4,
+    'enterprise': 5
+  };
+  
+  function getHigherPlan(plan1, plan2) {
+    const p1 = PLAN_HIERARCHY[plan1] || 1;
+    const p2 = PLAN_HIERARCHY[plan2] || 1;
+    return p1 >= p2 ? plan1 : plan2;
+  }
 
   /* ── BUILD & INJECT WIDGET ─────────────────────────────────────────────── */
-  function injectWidget(cfg) {
-    console.log('[ADA] Injecting widget for:', cfg.name);
+  function injectWidget(cfg, planTier, pageCount) {
+    console.log('[ADA] Injecting widget for:', cfg.name, 'Plan:', planTier, 'Pages:', pageCount);
+    
     const AGENCY   = cfg.agency_name    || "SwiftImpact Solutions";
     const CTA_URL  = cfg.cta_url        || "https://swiftimpactsolutions.com/ada";
     const DOMAIN   = cfg.domain         || CURRENT_DOMAIN;
@@ -70,6 +261,9 @@
     const PROFILES = cfg.enabled_profiles || {};
     const FEATURES = cfg.enabled_features || {};
     const NS       = "si";
+
+    // All plans get full features - pricing is based on page count only
+    console.log('[ADA] Plan tier:', planTier, 'Pages:', pageCount);
 
     if (document.getElementById(`${NS}-aw-host`)) return;
 
@@ -104,6 +298,9 @@
     host.style.cssText = `position:fixed;${posStyle}z-index:2147483647;`;
     document.body.appendChild(host);
     const shadow = host.attachShadow({ mode: "open" });
+    
+    // Store shadow reference globally for virtual keyboard access
+    window.__adaShadow = shadow;
 
     /* ── STYLES ─────────────────────────────────────────────────────────── */
     const STYLE = `
@@ -270,6 +467,15 @@
     const CLOSE_IC = `<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>`;
     const ACCESS_IC = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="4" r="2.5" fill="white"/><path d="M19 13v-2h-5.5l-.8-2.5c-.3-.8-1-1.3-1.8-1.3H9c-.8 0-1.5.5-1.8 1.2L5.5 13H3v2h3.5l1.7-5.2c.1-.3.4-.5.7-.5h1.5l.8 2.5c.3.8 1 1.3 1.8 1.3H19v5h-3v2h3c1.1 0 2-.9 2-2v-5c0-1.1-.9-2-2-2z" fill="white"/><path d="M7 17.5c0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5-2-4.5-4.5-4.5S7 15 7 17.5zm7 0c0 1.4-1.1 2.5-2.5 2.5S9 18.9 9 17.5s1.1-2.5 2.5-2.5 2.5 1.1 2.5 2.5z" fill="white"/></svg>`;
 
+    // All profiles available for all plans - pricing based on page count only
+    const visibleProfiles = [
+      { id: 'epilepsy', icon: '⚡', name: 'Epilepsy Safe', desc: 'Stops animations & flashing' },
+      { id: 'cognitive', icon: '🧠', name: 'Cognitive', desc: 'Simplified interface' },
+      { id: 'adhd', icon: '🎯', name: 'ADHD Friendly', desc: 'Focus mode' },
+      { id: 'blindness', icon: '👁️', name: 'Blindness', desc: 'Screen reader optimized' },
+      { id: 'visImpaired', icon: '👓', name: 'Visually Impaired', desc: 'Enhanced contrast' },
+    ];
+
     const tmpl = document.createElement("template");
     tmpl.innerHTML = `
 <style>${STYLE}</style>
@@ -279,7 +485,7 @@
 <div id="aw-vkb" role="toolbar" aria-label="Virtual Keyboard">
   <button id="aw-vkb-close">✕ Close Keyboard</button>
   <div class="aw-kb-row">
-    ${"`~1!2@3#4$5%6^7&8*9(0)-_=+".split("").map(k=>`<button class="aw-key" data-k="${k}">${k}</button>`).join("")}
+    ${"\`~1!2@3#4\$5%6^7&8*9(0)-_=+".split("").map(k=>`<button class="aw-key" data-k="${k}">${k}</button>`).join("")}
     <button class="aw-key wide" data-k="Backspace">⌫</button>
   </div>
   <div class="aw-kb-row">
@@ -307,313 +513,605 @@
 <button id="aw-trigger" aria-label="Open Accessibility Menu" aria-expanded="false" aria-haspopup="dialog">
   ${ACCESS_IC}
 </button>
-<div id="aw-panel" class="aw-hidden" role="dialog" aria-modal="true" aria-label="Accessibility Menu">
-  <a id="aw-cta" href="${CTA_URL}" target="_blank" rel="noopener noreferrer">
-    <strong>♿ Get a free ADA audit</strong>
+<div id="aw-panel" class="aw-hidden" role="dialog" aria-label="Accessibility Options">
+  <a id="aw-cta" href="${CTA_URL}" target="_blank" rel="noopener">
+    <strong>${AGENCY}</strong>
+    <span>Get ADA Compliant Today →</span>
   </a>
   <div id="aw-header">
-    <h2>Accessibility Menu</h2>
+    <div>
+      <h2>Accessibility</h2>
+    </div>
     <button id="aw-close" aria-label="Close">${CLOSE_IC}</button>
   </div>
-  <div id="aw-tabs" role="tablist">
-    <button class="aw-tab active" data-tab="profiles" role="tab" aria-selected="true">Profiles</button>
-    <button class="aw-tab" data-tab="content" role="tab" aria-selected="false">Content</button>
-    <button class="aw-tab" data-tab="visual" role="tab" aria-selected="false">Visual</button>
+  <div id="aw-tabs">
+    <button class="aw-tab active" data-tab="profiles">Profiles</button>
+    <button class="aw-tab" data-tab="content">Content</button>
+    <button class="aw-tab" data-tab="display">Display</button>
   </div>
   <div id="aw-body">
-    <div class="aw-pane active" data-pane="profiles">
-      <p class="aw-section-label">Disability Profiles</p>
+    <div class="aw-pane active" id="pane-profiles">
+      <div class="aw-section-label">Accessibility Profiles</div>
       <div class="aw-profiles">
-        ${PROFILES.epilepsy?'<button class="aw-profile-btn" data-profile="epilepsy"><span class="icon">⚡</span><span class="info"><strong>Epilepsy Safe</strong><span>Stops flashing animations & flickering content.</span></span></button>':''}
-        ${PROFILES.cognitive?'<button class="aw-profile-btn" data-profile="cognitive"><span class="icon">🧩</span><span class="info"><strong>Cognitive Disability</strong><span>Simplifies layout and boosts readability.</span></span></button>':''}
-        ${PROFILES.adhd?'<button class="aw-profile-btn" data-profile="adhd"><span class="icon">🎯</span><span class="info"><strong>ADHD Friendly</strong><span>Highlights focus areas, reduces distractions.</span></span></button>':''}
-        ${PROFILES.blindness?'<button class="aw-profile-btn" data-profile="blindness"><span class="icon">🦯</span><span class="info"><strong>Blindness Mode</strong><span>Optimizes for screen readers.</span></span></button>':''}
-        ${PROFILES.visImpaired?'<button class="aw-profile-btn" data-profile="visImpaired"><span class="icon">👁️</span><span class="info"><strong>Visually Impaired</strong><span>Large text, high contrast, magnified cursor.</span></span></button>':''}
+        ${visibleProfiles.map(p => `
+          <button class="aw-profile-btn" data-profile="${p.id}">
+            <span class="icon">${p.icon}</span>
+            <div class="info">
+              <strong>${p.name}</strong>
+              <span>${p.desc}</span>
+            </div>
+          </button>
+        `).join('')}
       </div>
     </div>
-    <div class="aw-pane" data-pane="content">
-      <p class="aw-section-label">Orientation</p>
+    <div class="aw-pane" id="pane-content">
+      <div class="aw-section-label">Content Adjustments</div>
       <div class="aw-grid">
-        <button class="aw-btn" data-toggle="cursor" data-val="black"><span class="bicon">🖱️</span>Big Black Cursor</button>
-        <button class="aw-btn" data-toggle="cursor" data-val="white"><span class="bicon">🖱️</span>Big White Cursor</button>
-        ${FEATURES.readingGuide?'<button class="aw-btn" data-toggle="readingGuide"><span class="bicon">📏</span>Reading Guide</button>':''}
-        ${FEATURES.readingMask?'<button class="aw-btn" data-toggle="readingMask"><span class="bicon">🎭</span>Reading Mask</button>':''}
+        <button class="aw-btn" data-feat="readableFont"><span class="bicon">🔤</span>Readable Font</button>
+        <button class="aw-btn" data-feat="dyslexia"><span class="bicon">🔠</span>Dyslexia Friendly</button>
+        <button class="aw-btn" data-feat="highlightTitles"><span class="bicon">📌</span>Highlight Titles</button>
+        <button class="aw-btn" data-feat="highlightLinks"><span class="bicon">🔗</span>Highlight Links</button>
+        <button class="aw-btn" data-feat="stopAnimations"><span class="bicon">⏹️</span>Stop Animations</button>
+        <button class="aw-btn" data-feat="muteSounds"><span class="bicon">🔇</span>Mute Sounds</button>
+        <button class="aw-btn" data-feat="hideImages"><span class="bicon">🖼️</span>Hide Images</button>
+        <button class="aw-btn" data-feat="virtualKeyboard"><span class="bicon">⌨️</span>Virtual Keyboard</button>
       </div>
-      <p class="aw-section-label">Content Tools</p>
-      <div class="aw-grid">
-        ${FEATURES.readableFont?'<button class="aw-btn" data-toggle="readableFont"><span class="bicon">🔤</span>Readable Font</button>':''}
-        ${FEATURES.dyslexia?'<button class="aw-btn" data-toggle="dyslexia"><span class="bicon">📖</span>Dyslexia Friendly</button>':''}
-        ${FEATURES.highlightTitles?'<button class="aw-btn" data-toggle="highlightTitles"><span class="bicon">🔆</span>Highlight Titles</button>':''}
-        ${FEATURES.highlightLinks?'<button class="aw-btn" data-toggle="highlightLinks"><span class="bicon">🔗</span>Highlight Links</button>':''}
-        ${FEATURES.stopAnimations?'<button class="aw-btn" data-toggle="stopAnimations"><span class="bicon">⏸️</span>Stop Animations</button>':''}
-        ${FEATURES.muteSounds?'<button class="aw-btn" data-toggle="muteSounds"><span class="bicon">🔇</span>Mute Sounds</button>':''}
-        <button class="aw-btn${FEATURES.hideImages?' active':''}" data-toggle="hideImages"><span class="bicon">🚫</span>Hide Images</button>
-        <button class="aw-btn${FEATURES.virtualKeyboard?' active':''}" data-toggle="virtualKeyboard"><span class="bicon">⌨️</span>Virtual Keyboard</button>
-      </div>
-      <p class="aw-section-label">Text Alignment</p>
+      <div class="aw-section-label">Text Alignment</div>
       <div class="aw-align-row">
-        <button class="aw-align-btn" data-align="left" aria-label="Align Left">&#8676;</button>
-        <button class="aw-align-btn" data-align="center" aria-label="Align Center">&#8644;</button>
-        <button class="aw-align-btn" data-align="right" aria-label="Align Right">&#8677;</button>
-      </div>
-      <p class="aw-section-label" style="margin-top:14px;">Size &amp; Spacing</p>
-      <div class="aw-slider-row">
-        <label>Font Size <span id="val-fontSize">100%</span></label>
-        <input type="range" id="sl-fontSize" min="75" max="200" step="5" value="100" aria-label="Font size">
-        <div class="aw-slider-btns"><button data-sl="fontSize" data-d="-5">− Decrease</button><button data-sl="fontSize" data-d="5">+ Increase</button></div>
-      </div>
-      <div class="aw-slider-row">
-        <label>Line Height <span id="val-lineHeight">100%</span></label>
-        <input type="range" id="sl-lineHeight" min="100" max="250" step="10" value="100" aria-label="Line height">
-        <div class="aw-slider-btns"><button data-sl="lineHeight" data-d="-10">− Decrease</button><button data-sl="lineHeight" data-d="10">+ Increase</button></div>
-      </div>
-      <div class="aw-slider-row">
-        <label>Letter Spacing <span id="val-letterSpacing">0px</span></label>
-        <input type="range" id="sl-letterSpacing" min="0" max="10" step="1" value="0" aria-label="Letter spacing">
-        <div class="aw-slider-btns"><button data-sl="letterSpacing" data-d="-1">− Decrease</button><button data-sl="letterSpacing" data-d="1">+ Increase</button></div>
+        <button class="aw-align-btn" data-align="left">⬅️</button>
+        <button class="aw-align-btn" data-align="center">⬆️</button>
+        <button class="aw-align-btn" data-align="right">➡️</button>
       </div>
     </div>
-    <div class="aw-pane" data-pane="visual">
-      <p class="aw-section-label">Contrast Modes (mutually exclusive)</p>
-      <div class="aw-grid">
-        <button class="aw-btn" data-toggle="contrast" data-val="dark"><span class="bicon">🌑</span>Dark Contrast</button>
-        <button class="aw-btn" data-toggle="contrast" data-val="mono"><span class="bicon">◑</span>Monochrome</button>
-        <button class="aw-btn" data-toggle="contrast" data-val="highSat"><span class="bicon">🎨</span>High Saturation</button>
-        <button class="aw-btn" data-toggle="contrast" data-val="lowSat"><span class="bicon">🩶</span>Low Saturation</button>
+    <div class="aw-pane" id="pane-display">
+      <div class="aw-section-label">Display & Colors</div>
+      <div class="aw-slider-row">
+        <label>Font Size <span id="val-fs">100%</span></label>
+        <input type="range" id="rng-fs" min="75" max="150" value="100">
+        <div class="aw-slider-btns">
+          <button data-reset="fontSize">Reset</button>
+        </div>
       </div>
-      <p class="aw-section-label">Color Adjustments</p>
-      <div class="aw-color-row"><span>Text Color</span><input type="color" id="cp-text" value="#000000" aria-label="Text color"><button data-cp-reset="text">Reset</button></div>
-      <div class="aw-color-row"><span>Title Color</span><input type="color" id="cp-title" value="#000000" aria-label="Title color"><button data-cp-reset="title">Reset</button></div>
-      <div class="aw-color-row"><span>Background</span><input type="color" id="cp-bg" value="#ffffff" aria-label="Background color"><button data-cp-reset="bg">Reset</button></div>
+      <div class="aw-slider-row">
+        <label>Line Height <span id="val-lh">100%</span></label>
+        <input type="range" id="rng-lh" min="100" max="200" value="100">
+        <div class="aw-slider-btns">
+          <button data-reset="lineHeight">Reset</button>
+        </div>
+      </div>
+      <div class="aw-slider-row">
+        <label>Letter Spacing <span id="val-ls">0px</span></label>
+        <input type="range" id="rng-ls" min="0" max="10" value="0">
+        <div class="aw-slider-btns">
+          <button data-reset="letterSpacing">Reset</button>
+        </div>
+      </div>
+      <div class="aw-section-label">Colors</div>
+      <div class="aw-color-row">
+        <span>Text Color</span>
+        <div>
+          <input type="color" id="col-text" value="#000000">
+          <button data-reset="textColor">Reset</button>
+        </div>
+      </div>
+      <div class="aw-color-row">
+        <span>Title Color</span>
+        <div>
+          <input type="color" id="col-title" value="#000000">
+          <button data-reset="titleColor">Reset</button>
+        </div>
+      </div>
+      <div class="aw-color-row">
+        <span>Background</span>
+        <div>
+          <input type="color" id="col-bg" value="#ffffff">
+          <button data-reset="bgColor">Reset</button>
+        </div>
+      </div>
+      <div class="aw-section-label">Contrast Modes</div>
+      <div class="aw-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <button class="aw-btn" data-contrast="dark"><span class="bicon">🌙</span>Dark</button>
+        <button class="aw-btn" data-contrast="light"><span class="bicon">☀️</span>Light</button>
+        <button class="aw-btn" data-contrast="high"><span class="bicon">🔲</span>High Contrast</button>
+      </div>
+    </div>
+    <div id="aw-footer">
+      <button id="aw-reset">Reset All</button>
+      <div id="aw-powered">Powered by<br><a href="${CTA_URL}" target="_blank">${AGENCY}</a></div>
     </div>
   </div>
-  <div id="aw-footer">
-    <button id="aw-reset">↺ Reset All Settings</button>
-    <div id="aw-powered">Powered by<br><a href="${CTA_URL}" target="_blank" rel="noopener">${AGENCY}</a></div>
-  </div>
-</div>`;
+</div>
+`;
 
     shadow.appendChild(tmpl.content.cloneNode(true));
 
-    const $  = sel => shadow.querySelector(sel);
-    const $$ = sel => shadow.querySelectorAll(sel);
-    const panel    = $("#aw-panel");
-    const trigger  = $("#aw-trigger");
-    const closeBtn = $("#aw-close");
-    const rguide   = $("#aw-rguide");
-    const rmaskTop = $("#aw-rmask-top");
-    const rmaskBot = $("#aw-rmask-bot");
-    const vkb      = $("#aw-vkb");
+    /* ── INTERACTION HANDLERS ─────────────────────────────────────────────── */
+    const trigger = shadow.getElementById("aw-trigger");
+    const panel   = shadow.getElementById("aw-panel");
+    const close   = shadow.getElementById("aw-close");
+    const tabs    = shadow.querySelectorAll(".aw-tab");
+    const panes   = shadow.querySelectorAll(".aw-pane");
+    const reset   = shadow.getElementById("aw-reset");
 
-    const pageStyle = document.createElement("style");
-    pageStyle.id = `${NS}-aw-page-style`;
-    document.head.appendChild(pageStyle);
-
-    const PROFILE_EFFECTS = {
-      epilepsy:   () => { applyToggle("stopAnimations", true); },
-      cognitive:  () => { applyToggle("readableFont", true); S.fontSize = Math.max(S.fontSize, 110); applySliders(); },
-      adhd:       () => { applyToggle("readingGuide", true); applyToggle("highlightLinks", true); },
-      blindness:  () => { applyToggle("hideImages", true); applyToggle("highlightTitles", true); applyToggle("highlightLinks", true); },
-      visImpaired:() => { S.fontSize = Math.max(S.fontSize, 125); applySliders(); applyContrast("dark"); S.cursor = "black"; applyCursor(); },
-    };
-
-    function renderPageCSS() {
-      const rules = [];
-      if (S.readableFont)    rules.push(`body,body *{font-family:'Georgia',serif!important;}`);
-      if (S.dyslexia)        rules.push(`@import url('https://fonts.googleapis.com/css2?family=Lexend&display=swap');body,body *{font-family:'Lexend',sans-serif!important;letter-spacing:.06em!important;word-spacing:.18em!important;}`);
-      if (S.highlightTitles) rules.push(`h1,h2,h3,h4,h5,h6{background:rgba(0,123,255,.15)!important;border-left:4px solid ${COLOR}!important;padding-left:6px!important;}`);
-      if (S.highlightLinks)  rules.push(`a{background:rgba(255,200,0,.25)!important;outline:2px solid #cc8800!important;}`);
-      if (S.stopAnimations)  rules.push(`*,*::before,*::after{animation:none!important;transition:none!important;}`);
-      if (S.hideImages)      rules.push(`img,picture,figure,video,canvas{visibility:hidden!important;}`);
-      if (S.contrast==="dark")    rules.push(`html{filter:invert(1) hue-rotate(180deg)!important;}img,video,canvas{filter:invert(1) hue-rotate(180deg)!important;}`);
-      if (S.contrast==="mono")    rules.push(`html{filter:grayscale(1)!important;}`);
-      if (S.contrast==="highSat") rules.push(`html{filter:saturate(3)!important;}`);
-      if (S.contrast==="lowSat")  rules.push(`html{filter:saturate(.3)!important;}`);
-      if (S.textAlign)  rules.push(`body,body *{text-align:${S.textAlign}!important;}`);
-      if (S.textColor)  rules.push(`body,p,li,td,span{color:${S.textColor}!important;}`);
-      if (S.titleColor) rules.push(`h1,h2,h3,h4,h5,h6{color:${S.titleColor}!important;}`);
-      if (S.bgColor)    rules.push(`body{background-color:${S.bgColor}!important;}`);
-      pageStyle.textContent = rules.join("\n");
-    }
-
-    function applySliders() {
-      const fs=S.fontSize, lh=S.lineHeight, ls=S.letterSpacing;
-      let h="";
-      if(fs!==100) h+=`font-size:${fs}%!important;`;
-      if(lh!==100) h+=`line-height:${lh/100}!important;`;
-      if(ls!==0)   h+=`letter-spacing:${ls}px!important;`;
-      document.documentElement.style.cssText=h;
-      const fsEl=$("#val-fontSize"),lhEl=$("#val-lineHeight"),lsEl=$("#val-letterSpacing");
-      if(fsEl) fsEl.textContent=fs+"%";
-      if(lhEl) lhEl.textContent=lh+"%";
-      if(lsEl) lsEl.textContent=ls+"px";
-      const slFs=$("#sl-fontSize"),slLh=$("#sl-lineHeight"),slLs=$("#sl-letterSpacing");
-      if(slFs) slFs.value=fs;
-      if(slLh) slLh.value=lh;
-      if(slLs) slLs.value=ls;
-    }
-
-    function applyCursor() {
-      if(S.cursor==="black") document.body.style.cursor=toCursor(SVG_BLACK);
-      else if(S.cursor==="white") document.body.style.cursor=toCursor(SVG_WHITE);
-      else document.body.style.cursor="";
-      $$(".aw-btn[data-toggle='cursor']").forEach(b=>b.classList.toggle("active",b.dataset.val===S.cursor));
-    }
-
-    function applyContrast(val) {
-      S.contrast=(S.contrast===val)?null:val;
-      $$(".aw-btn[data-toggle='contrast']").forEach(b=>b.classList.toggle("active",b.dataset.val===S.contrast));
-      renderPageCSS();
-    }
-
-    function applyToggle(key,forceOn) {
-      if(forceOn!==undefined) S[key]=forceOn;
-      else S[key]=!S[key];
-      const btn=$(`[data-toggle='${key}']`);
-      if(btn) btn.classList.toggle("active",S[key]);
-      if(key==="readingGuide") rguide.style.display=S.readingGuide?"block":"none";
-      if(key==="readingMask")  { rmaskTop.style.display=S.readingMask?"block":"none"; rmaskBot.style.display=S.readingMask?"block":"none"; }
-      if(key==="muteSounds")   document.querySelectorAll("audio,video").forEach(m=>m.muted=S.muteSounds);
-      if(key==="virtualKeyboard") vkb.classList.toggle("visible",S.virtualKeyboard);
-      renderPageCSS();
-    }
-
-    document.addEventListener("mousemove",e=>{
-      if(S.readingGuide){rguide.style.top=(e.clientY-1)+"px";rguide.style.display="block";}
-      if(S.readingMask){const h=60;rmaskTop.style.top="0";rmaskTop.style.height=Math.max(0,e.clientY-h)+"px";rmaskBot.style.top=(e.clientY+h)+"px";rmaskBot.style.bottom="0";rmaskBot.style.height="auto";}
+    // Toggle panel
+    trigger.addEventListener("click", () => {
+      S.open = !S.open;
+      trigger.setAttribute("aria-expanded", S.open);
+      panel.classList.toggle("aw-hidden", !S.open);
     });
 
-    function openPanel()  { S.open=true;  panel.classList.remove("aw-hidden"); trigger.setAttribute("aria-expanded","true");  closeBtn.focus(); }
-    function closePanel() { S.open=false; panel.classList.add("aw-hidden");    trigger.setAttribute("aria-expanded","false"); trigger.focus(); }
-
-    trigger.addEventListener("click",()=>{
-      console.log('[ADA] Widget button clicked, open:', !S.open);
-      S.open?closePanel():openPanel();
+    // Close panel
+    close.addEventListener("click", () => {
+      S.open = false;
+      trigger.setAttribute("aria-expanded", "false");
+      panel.classList.add("aw-hidden");
     });
-    closeBtn.addEventListener("click",closePanel);
-    document.addEventListener("click",e=>{ if(S.open&&!host.contains(e.target)) closePanel(); });
-    document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&S.open) closePanel(); });
 
-    $$(".aw-tab").forEach(tab=>{
-      tab.addEventListener("click",()=>{
-        S.tab=tab.dataset.tab;
-        $$(".aw-tab").forEach(t=>{t.classList.remove("active");t.setAttribute("aria-selected","false");});
-        tab.classList.add("active");tab.setAttribute("aria-selected","true");
-        $$(".aw-pane").forEach(p=>p.classList.remove("active"));
-        $(`[data-pane="${S.tab}"]`).classList.add("active");
+    // Tab switching
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        const t = tab.dataset.tab;
+        S.tab = t;
+        tabs.forEach(x => x.classList.toggle("active", x === tab));
+        panes.forEach(p => p.classList.toggle("active", p.id === `pane-${t}`));
       });
     });
 
-    $$(".aw-profile-btn").forEach(btn=>{
-      btn.addEventListener("click",()=>{
-        const key=btn.dataset.profile;
-        S[key]=!S[key];
-        btn.classList.toggle("active",S[key]);
-        if(S[key]&&PROFILE_EFFECTS[key]) PROFILE_EFFECTS[key]();
-        renderPageCSS();
+    // Profile buttons
+    shadow.querySelectorAll("[data-profile]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const p = btn.dataset.profile;
+        S[p] = !S[p];
+        btn.classList.toggle("active", S[p]);
+        applyProfile(p, S[p]);
       });
     });
 
-    shadow.addEventListener("click",e=>{
-      const btn=e.target.closest("[data-toggle]");
-      if(!btn) return;
-      const toggle=btn.dataset.toggle,val=btn.dataset.val;
-      if(toggle==="cursor"){S.cursor=(S.cursor===val)?null:val;applyCursor();return;}
-      if(toggle==="contrast"){applyContrast(val);return;}
-      applyToggle(toggle);
-    });
-
-    $$(".aw-align-btn").forEach(btn=>{
-      btn.addEventListener("click",()=>{
-        const a=btn.dataset.align;
-        S.textAlign=(S.textAlign===a)?null:a;
-        $$(".aw-align-btn").forEach(b=>b.classList.toggle("active",b.dataset.align===S.textAlign));
-        renderPageCSS();
+    // Feature buttons
+    shadow.querySelectorAll("[data-feat]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const f = btn.dataset.feat;
+        S[f] = !S[f];
+        btn.classList.toggle("active", S[f]);
+        applyFeature(f, S[f]);
       });
     });
 
-    [["fontSize"],["lineHeight"],["letterSpacing"]].forEach(([key])=>{
-      const sl=$(`#sl-${key}`);
-      if(!sl) return;
-      sl.addEventListener("input",()=>{S[key]=parseFloat(sl.value);applySliders();});
+    // Alignment buttons
+    shadow.querySelectorAll("[data-align]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const a = btn.dataset.align;
+        S.textAlign = S.textAlign === a ? null : a;
+        shadow.querySelectorAll("[data-align]").forEach(b => b.classList.toggle("active", b.dataset.align === S.textAlign));
+        applyTextAlign(S.textAlign);
+      });
     });
 
-    shadow.addEventListener("click",e=>{
-      const btn=e.target.closest("[data-sl]");
-      if(!btn) return;
-      const key=btn.dataset.sl,d=parseFloat(btn.dataset.d);
-      const sl=$(`#sl-${key}`);
-      S[key]=Math.min(parseFloat(sl.max),Math.max(parseFloat(sl.min),S[key]+d));
-      applySliders();
+    // Contrast buttons
+    shadow.querySelectorAll("[data-contrast]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const c = btn.dataset.contrast;
+        S.contrast = S.contrast === c ? null : c;
+        shadow.querySelectorAll("[data-contrast]").forEach(b => b.classList.toggle("active", b.dataset.contrast === S.contrast));
+        applyContrast(S.contrast);
+      });
     });
 
-    [["cp-text","textColor"],["cp-title","titleColor"],["cp-bg","bgColor"]].forEach(([id,key])=>{
-      const inp=$(`#${id}`);
-      if(!inp) return;
-      inp.addEventListener("input",()=>{S[key]=inp.value;renderPageCSS();});
+    // Sliders
+    const fsSlider = shadow.getElementById("rng-fs");
+    const lhSlider = shadow.getElementById("rng-lh");
+    const lsSlider = shadow.getElementById("rng-ls");
+
+    fsSlider.addEventListener("input", (e) => {
+      S.fontSize = parseInt(e.target.value);
+      shadow.getElementById("val-fs").textContent = S.fontSize + "%";
+      applyFontSize(S.fontSize);
     });
 
-    shadow.addEventListener("click",e=>{
-      const btn=e.target.closest("[data-cp-reset]");
-      if(!btn) return;
-      const map={text:"textColor",title:"titleColor",bg:"bgColor"};
-      const idMap={text:"cp-text",title:"cp-title",bg:"cp-bg"};
-      const key=btn.getAttribute("data-cp-reset");
-      S[map[key]]="";
-      const inp=$(`#${idMap[key]}`);
-      if(inp) inp.value=(key==="bg")?"#ffffff":"#000000";
-      renderPageCSS();
+    lhSlider.addEventListener("input", (e) => {
+      S.lineHeight = parseInt(e.target.value);
+      shadow.getElementById("val-lh").textContent = S.lineHeight + "%";
+      applyLineHeight(S.lineHeight);
     });
 
-    vkb.addEventListener("click",e=>{
-      const key=e.target.closest("[data-k]");
-      if(!key) return;
-      const k=key.dataset.k;
-      const focused=document.activeElement;
-      if(focused&&(focused.tagName==="INPUT"||focused.tagName==="TEXTAREA")){
-        const start=focused.selectionStart,end=focused.selectionEnd;
-        if(k==="Backspace"){focused.value=focused.value.slice(0,Math.max(0,start-1))+focused.value.slice(end);focused.selectionStart=focused.selectionEnd=Math.max(0,start-1);}
-        else if(k==="Enter"){focused.value=focused.value.slice(0,start)+"\n"+focused.value.slice(end);focused.selectionStart=focused.selectionEnd=start+1;}
-        else if(k==="Tab"){focused.value=focused.value.slice(0,start)+"\t"+focused.value.slice(end);focused.selectionStart=focused.selectionEnd=start+1;}
-        else if(k.length===1||k===" "){focused.value=focused.value.slice(0,start)+k+focused.value.slice(end);focused.selectionStart=focused.selectionEnd=start+1;}
+    lsSlider.addEventListener("input", (e) => {
+      S.letterSpacing = parseInt(e.target.value);
+      shadow.getElementById("val-ls").textContent = S.letterSpacing + "px";
+      applyLetterSpacing(S.letterSpacing);
+    });
+
+    // Color pickers
+    shadow.getElementById("col-text").addEventListener("input", (e) => {
+      S.textColor = e.target.value;
+      applyTextColor(S.textColor);
+    });
+
+    shadow.getElementById("col-title").addEventListener("input", (e) => {
+      S.titleColor = e.target.value;
+      applyTitleColor(S.titleColor);
+    });
+
+    shadow.getElementById("col-bg").addEventListener("input", (e) => {
+      S.bgColor = e.target.value;
+      applyBgColor(S.bgColor);
+    });
+
+    // Reset buttons
+    shadow.querySelectorAll("[data-reset]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const r = btn.dataset.reset;
+        switch(r) {
+          case "fontSize": S.fontSize = 100; fsSlider.value = 100; shadow.getElementById("val-fs").textContent = "100%"; applyFontSize(100); break;
+          case "lineHeight": S.lineHeight = 100; lhSlider.value = 100; shadow.getElementById("val-lh").textContent = "100%"; applyLineHeight(100); break;
+          case "letterSpacing": S.letterSpacing = 0; lsSlider.value = 0; shadow.getElementById("val-ls").textContent = "0px"; applyLetterSpacing(0); break;
+          case "textColor": S.textColor = ""; shadow.getElementById("col-text").value = "#000000"; applyTextColor(""); break;
+          case "titleColor": S.titleColor = ""; shadow.getElementById("col-title").value = "#000000"; applyTitleColor(""); break;
+          case "bgColor": S.bgColor = ""; shadow.getElementById("col-bg").value = "#ffffff"; applyBgColor(""); break;
+        }
+      });
+    });
+
+    // Virtual keyboard key handlers
+    const vkb = shadow.getElementById('aw-vkb');
+    const vkbClose = shadow.getElementById('aw-vkb-close');
+    
+    // Close keyboard button
+    if (vkbClose) {
+      vkbClose.addEventListener('click', () => {
+        S.virtualKeyboard = false;
+        shadow.querySelector('[data-feat="virtualKeyboard"]')?.classList.remove('active');
+        vkb.classList.remove('visible');
+        vkb.style.display = 'none';
+      });
+    }
+    
+    // Keyboard keys
+    shadow.querySelectorAll('.aw-key').forEach(key => {
+      key.addEventListener('click', (e) => {
+        e.preventDefault();
+        const keyValue = key.dataset.k;
+        const activeElement = document.activeElement;
+        
+        if (!activeElement || (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA')) {
+          // Try to find an input to focus
+          const firstInput = document.querySelector('input:not([type="hidden"]), textarea');
+          if (firstInput) {
+            firstInput.focus();
+            firstInput.click();
+          }
+          return;
+        }
+        
+        // Handle special keys
+        switch(keyValue) {
+          case 'Backspace':
+            if (activeElement.selectionStart || activeElement.selectionStart === 0) {
+              const start = activeElement.selectionStart;
+              const end = activeElement.selectionEnd;
+              if (start === end && start > 0) {
+                activeElement.value = activeElement.value.substring(0, start - 1) + activeElement.value.substring(end);
+                activeElement.selectionStart = activeElement.selectionEnd = start - 1;
+              } else if (start !== end) {
+                activeElement.value = activeElement.value.substring(0, start) + activeElement.value.substring(end);
+                activeElement.selectionStart = activeElement.selectionEnd = start;
+              }
+            } else {
+              activeElement.value = activeElement.value.slice(0, -1);
+            }
+            break;
+          case 'Enter':
+            activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter' }));
+            if (activeElement.form) {
+              const submitBtn = activeElement.form.querySelector('button[type="submit"], input[type="submit"]');
+              if (submitBtn) submitBtn.click();
+            }
+            break;
+          case 'Tab':
+            const focusable = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, button, select, a[href]'));
+            const currentIndex = focusable.indexOf(activeElement);
+            const nextIndex = (currentIndex + 1) % focusable.length;
+            if (focusable[nextIndex]) {
+              focusable[nextIndex].focus();
+              focusable[nextIndex].click();
+            }
+            break;
+          case 'Space':
+          case ' ':
+            insertAtCursor(activeElement, ' ');
+            break;
+          default:
+            insertAtCursor(activeElement, keyValue);
+        }
+        
+        // Trigger input event
+        activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    });
+    
+    // Helper function to insert text at cursor position
+    function insertAtCursor(element, text) {
+      if (element.selectionStart || element.selectionStart === 0) {
+        const start = element.selectionStart;
+        const end = element.selectionEnd;
+        element.value = element.value.substring(0, start) + text + element.value.substring(end);
+        element.selectionStart = element.selectionEnd = start + text.length;
+      } else {
+        element.value += text;
       }
-    });
+    }
 
-    $("#aw-vkb-close").addEventListener("click",()=>{
-      S.virtualKeyboard=false;
-      vkb.classList.remove("visible");
-      const b=$("[data-toggle='virtualKeyboard']");
-      if(b) b.classList.remove("active");
-    });
-
-    $("#aw-reset").addEventListener("click",()=>{
-      Object.assign(S,{
-        epilepsy:false,cognitive:false,adhd:false,blindness:false,visImpaired:false,
-        cursor:null,contrast:null,textAlign:null,
-        readableFont:false,dyslexia:false,highlightTitles:false,highlightLinks:false,
-        stopAnimations:false,muteSounds:false,hideImages:false,virtualKeyboard:false,
-        readingGuide:false,readingMask:false,
-        fontSize:100,lineHeight:100,letterSpacing:0,
-        textColor:"",titleColor:"",bgColor:"",
+    // Reset all
+    reset.addEventListener("click", () => {
+      Object.keys(S).forEach(k => {
+        if (typeof S[k] === "boolean") S[k] = false;
+        if (typeof S[k] === "number") S[k] = k === "fontSize" ? 100 : k === "lineHeight" ? 100 : 0;
+        if (typeof S[k] === "string" && k !== "tab") S[k] = "";
       });
-      pageStyle.textContent="";
-      document.documentElement.style.cssText="";
-      document.body.style.cursor="";
-      document.querySelectorAll("audio,video").forEach(m=>m.muted=false);
-      rguide.style.display="none";
-      rmaskTop.style.display="none";
-      rmaskBot.style.display="none";
-      vkb.classList.remove("visible");
-      $$(".aw-profile-btn,.aw-btn,.aw-align-btn").forEach(b=>b.classList.remove("active"));
-      applySliders();
-      const cpT=$("#cp-text"),cpH=$("#cp-title"),cpB=$("#cp-bg");
-      if(cpT) cpT.value="#000000";
-      if(cpH) cpH.value="#000000";
-      if(cpB) cpB.value="#ffffff";
+      // Reset UI
+      shadow.querySelectorAll(".aw-profile-btn, .aw-btn, .aw-align-btn").forEach(b => b.classList.remove("active"));
+      fsSlider.value = 100; shadow.getElementById("val-fs").textContent = "100%";
+      lhSlider.value = 100; shadow.getElementById("val-lh").textContent = "100%";
+      lsSlider.value = 0; shadow.getElementById("val-ls").textContent = "0px";
+      shadow.getElementById("col-text").value = "#000000";
+      shadow.getElementById("col-title").value = "#000000";
+      shadow.getElementById("col-bg").value = "#ffffff";
+      // Hide virtual keyboard
+      if (vkb) {
+        vkb.classList.remove('visible');
+        vkb.style.display = 'none';
+      }
+      // Reset page
+      resetAll();
     });
 
-    /* Widget loaded - all features start disabled, user must toggle them on */
-    console.log('[ADA] Widget ready - waiting for user interaction');
+    console.log('[ADA] Widget initialized');
   }
 
+  /* ── APPLY FUNCTIONS ──────────────────────────────────────────────────── */
+  function applyProfile(profile, enabled) {
+    const doc = document.documentElement;
+    switch(profile) {
+      case 'epilepsy':
+        doc.style.setProperty('--aw-epilepsy', enabled ? 'none' : '');
+        document.querySelectorAll('*, *::before, *::after').forEach(el => {
+          el.style.animation = enabled ? 'none !important' : '';
+          el.style.transition = enabled ? 'none !important' : '';
+        });
+        break;
+      case 'cognitive':
+        doc.classList.toggle('aw-cognitive', enabled);
+        break;
+      case 'adhd':
+        doc.classList.toggle('aw-adhd', enabled);
+        break;
+      case 'blindness':
+        doc.classList.toggle('aw-blindness', enabled);
+        break;
+      case 'visImpaired':
+        doc.classList.toggle('aw-vis-impaired', enabled);
+        break;
+    }
+  }
+
+  function applyFeature(feature, enabled) {
+    const doc = document.documentElement;
+    switch(feature) {
+      case 'readableFont':
+        doc.classList.toggle('aw-readable-font', enabled);
+        break;
+      case 'dyslexia':
+        doc.classList.toggle('aw-dyslexia', enabled);
+        break;
+      case 'highlightTitles':
+        doc.classList.toggle('aw-highlight-titles', enabled);
+        break;
+      case 'highlightLinks':
+        doc.classList.toggle('aw-highlight-links', enabled);
+        break;
+      case 'stopAnimations':
+        document.querySelectorAll('*, *::before, *::after').forEach(el => {
+          el.style.animationPlayState = enabled ? 'paused' : '';
+        });
+        break;
+      case 'muteSounds':
+        document.querySelectorAll('audio, video').forEach(el => {
+          el.muted = enabled;
+        });
+        break;
+      case 'hideImages':
+        doc.classList.toggle('aw-hide-images', enabled);
+        break;
+      case 'virtualKeyboard':
+        const shadowRoot = window.__adaShadow;
+        if (!shadowRoot) return;
+        const vkb = shadowRoot.getElementById('aw-vkb');
+        if (!vkb) return;
+        
+        if (enabled) {
+          vkb.classList.add('visible');
+          vkb.style.display = 'flex';
+          // Focus on first input on the page
+          const firstInput = document.querySelector('input:not([type="hidden"]), textarea');
+          if (firstInput) {
+            firstInput.focus();
+            firstInput.click();
+          }
+        } else {
+          vkb.classList.remove('visible');
+          vkb.style.display = 'none';
+        }
+        break;
+    }
+  }
+
+  function applyTextAlign(align) {
+    document.body.style.textAlign = align || '';
+  }
+
+  function applyContrast(contrast) {
+    const doc = document.documentElement;
+    doc.classList.remove('aw-contrast-dark', 'aw-contrast-light', 'aw-contrast-high');
+    if (contrast) doc.classList.add(`aw-contrast-${contrast}`);
+  }
+
+  function applyFontSize(size) {
+    document.documentElement.style.fontSize = size + '%';
+  }
+
+  function applyLineHeight(height) {
+    document.body.style.lineHeight = height + '%';
+  }
+
+  function applyLetterSpacing(spacing) {
+    document.body.style.letterSpacing = spacing + 'px';
+  }
+
+  function applyTextColor(color) {
+    document.body.style.color = color || '';
+  }
+
+  function applyTitleColor(color) {
+    document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(el => {
+      el.style.color = color || '';
+    });
+  }
+
+  function applyBgColor(color) {
+    document.body.style.backgroundColor = color || '';
+  }
+
+  function resetAll() {
+    const doc = document.documentElement;
+    doc.className = doc.className.replace(/aw-[^\s]*/g, '').trim();
+    document.body.style.cssText = '';
+    document.documentElement.style.cssText = '';
+    document.querySelectorAll('*, *::before, *::after').forEach(el => {
+      el.style.animation = '';
+      el.style.transition = '';
+      el.style.animationPlayState = '';
+    });
+    document.querySelectorAll('audio, video').forEach(el => {
+      el.muted = false;
+    });
+  }
+
+  /* ── INJECT GLOBAL STYLES ─────────────────────────────────────────────── */
+  function injectGlobalStyles() {
+    if (document.getElementById('aw-global-styles')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'aw-global-styles';
+    style.textContent = `
+      /* Highlight Titles */
+      .aw-highlight-titles h1,
+      .aw-highlight-titles h2,
+      .aw-highlight-titles h3,
+      .aw-highlight-titles h4,
+      .aw-highlight-titles h5,
+      .aw-highlight-titles h6 {
+        background-color: #ffeb3b !important;
+        color: #000 !important;
+        padding: 4px 8px !important;
+        border-radius: 4px !important;
+      }
+      
+      /* Highlight Links */
+      .aw-highlight-links a {
+        background-color: #ffeb3b !important;
+        color: #000 !important;
+        padding: 2px 4px !important;
+        border-radius: 2px !important;
+        text-decoration: underline !important;
+        font-weight: bold !important;
+      }
+      
+      /* Hide Images */
+      .aw-hide-images img,
+      .aw-hide-images picture,
+      .aw-hide-images figure,
+      .aw-hide-images [style*="background-image"] {
+        display: none !important;
+        visibility: hidden !important;
+      }
+      
+      /* Readable Font */
+      .aw-readable-font,
+      .aw-readable-font * {
+        font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif !important;
+        line-height: 1.6 !important;
+      }
+      
+      /* Dyslexia Friendly */
+      .aw-dyslexia,
+      .aw-dyslexia * {
+        font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif !important;
+        letter-spacing: 0.05em !important;
+        word-spacing: 0.1em !important;
+        line-height: 1.8 !important;
+      }
+      
+      /* Epilepsy Safe - Stop Animations */
+      .aw-epilepsy *,
+      .aw-epilepsy *::before,
+      .aw-epilepsy *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      
+      /* Cognitive - Simplified Interface */
+      .aw-cognitive * {
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+      }
+      
+      /* ADHD - Focus Mode */
+      .aw-adhd *:not(:focus):not(:hover) {
+        opacity: 0.7 !important;
+      }
+      .aw-adhd *:focus,
+      .aw-adhd *:hover {
+        opacity: 1 !important;
+        outline: 3px solid #007bff !important;
+      }
+      
+      /* Blindness - Screen Reader Optimized */
+      .aw-blindness {
+        background: #000 !important;
+        color: #fff !important;
+      }
+      
+      /* Visually Impaired - High Contrast */
+      .aw-vis-impaired {
+        filter: contrast(150%) !important;
+      }
+      
+      /* Contrast Modes */
+      .aw-contrast-dark {
+        filter: invert(1) hue-rotate(180deg) !important;
+        background: #000 !important;
+      }
+      .aw-contrast-light {
+        filter: contrast(120%) brightness(110%) !important;
+        background: #fff !important;
+      }
+      .aw-contrast-high {
+        filter: contrast(200%) !important;
+      }
+      
+      /* Cursor Styles */
+      .aw-cursor-black {
+        cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpolygon points='5,3 5,33 14,24 19,37 23,35 18,22 28,22' fill='%23000' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E") 5 3, auto !important;
+      }
+      .aw-cursor-white {
+        cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpolygon points='5,3 5,33 14,24 19,37 23,35 18,22 28,22' fill='%23fff' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E") 5 3, auto !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  /* ── START ────────────────────────────────────────────────────────────── */
+  injectGlobalStyles();
+  loadWidget();
 })();

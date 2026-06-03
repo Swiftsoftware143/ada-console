@@ -8,7 +8,7 @@ import {
   DEFAULT_PROFILES,
   DEFAULT_FEATURES,
 } from "@/lib/supabase";
-import { cleanDomain, generateEmbedCode } from "@/lib/helpers";
+import { cleanDomain, generateEmbedCode, getCdnDomain } from "@/lib/helpers";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,12 @@ export default function PersonalWebsiteDetail() {
   const [tagInput, setTagInput] = useState("");
   const [profileFilter, setProfileFilter] = useState("");
   const [featureFilter, setFeatureFilter] = useState("");
+  const [cdnDomain, setCdnDomain] = useState("https://adaswift.netlify.app");
+
+  const loadCdnDomain = useCallback(async () => {
+    const domain = await getCdnDomain();
+    setCdnDomain(domain);
+  }, []);
 
   const loadTags = useCallback(async () => {
     try {
@@ -97,12 +103,13 @@ export default function PersonalWebsiteDetail() {
       }
       setWebsite(hydrate(data));
       loadTags();
+      loadCdnDomain();
       setLoading(false);
     })();
     return () => {
       alive = false;
     };
-  }, [id, navigate, loadTags]);
+  }, [id, navigate, loadTags, loadCdnDomain]);
 
   const update = useCallback(
     (patch) => setWebsite((w) => ({ ...w, ...patch })),
@@ -125,11 +132,87 @@ export default function PersonalWebsiteDetail() {
     []
   );
 
+  // Helper to get current tags array - defined before handleSave to avoid dependency issues
+  const getCurrentTags = useCallback(() => {
+    if (!website?.tags) return [];
+    if (Array.isArray(website.tags)) return website.tags;
+    if (typeof website.tags === 'string') {
+      return website.tags.split(',').map(t => t.trim()).filter(Boolean);
+    }
+    return [];
+  }, [website?.tags]);
+
   const handleSave = useCallback(async () => {
     if (!website) return;
     setSaving(true);
     try {
       console.log("Saving website:", id, "Current tags:", website.tags);
+      
+      // Get current tags array
+      const currentTags = getCurrentTags();
+      
+      // Find any new tags that aren't in the Tag Manager yet (case-insensitive)
+      const newTags = currentTags.filter(tag => 
+        !availableTags.some(t => t.toLowerCase() === tag.toLowerCase())
+      );
+      
+      // Sync new tags to Tag Manager
+      if (newTags.length > 0) {
+        console.log("Syncing new tags to Tag Manager:", newTags);
+        try {
+          const { data: settingsData } = await supabase
+            .from("settings")
+            .select("value")
+            .eq("key", "tags")
+            .maybeSingle();
+          
+          let currentSettingsTags = [];
+          if (settingsData?.value) {
+            currentSettingsTags = typeof settingsData.value === 'string'
+              ? settingsData.value.split(',').map(t => t.trim()).filter(Boolean)
+              : Array.isArray(settingsData.value) ? settingsData.value : [];
+          }
+          
+          // Case-insensitive check against settings tags
+          const tagsToAdd = newTags.filter(tag => 
+            !currentSettingsTags.some(t => t.toLowerCase() === tag.toLowerCase())
+          );
+          
+          if (tagsToAdd.length > 0) {
+            const updatedTags = [...currentSettingsTags, ...tagsToAdd];
+            // Try update first, then insert if not exists
+            const { error: updateError } = await supabase
+              .from("settings")
+              .update({ 
+                value: updatedTags.join(", "),
+                updated_at: new Date().toISOString() 
+              })
+              .eq("key", "tags");
+            
+            if (updateError) {
+              console.log("Update failed, trying insert:", updateError);
+              // If update fails, try insert
+              const { error: insertError } = await supabase
+                .from("settings")
+                .insert({ 
+                  key: "tags", 
+                  value: updatedTags.join(", "),
+                  updated_at: new Date().toISOString() 
+                });
+              if (insertError) {
+                console.error("Insert also failed:", insertError);
+              }
+            }
+            console.log("Added new tags to Tag Manager:", tagsToAdd);
+          }
+          
+          // Update local available tags
+          setAvailableTags(prev => [...prev, ...newTags].sort());
+        } catch (e) {
+          console.error("Error syncing tags to Tag Manager:", e);
+          // Don't fail the save if tag sync fails
+        }
+      }
       
       // Build update payload - match database schema exactly
       const updateData = {};
@@ -137,11 +220,19 @@ export default function PersonalWebsiteDetail() {
       // Only include fields that are actually set
       if (website.name) updateData.name = website.name;
       if (website.domain) updateData.domain = cleanDomain(website.domain);
+      if (website.contact_email !== undefined) updateData.contact_email = website.contact_email || null;
+      if (website.contact_name !== undefined) updateData.contact_name = website.contact_name || null;
       if (website.plan_tier) updateData.plan_tier = website.plan_tier;
       
-      // Handle tags - database expects array
+      // Handle tags - database expects text (comma-separated), not array
       if (website.tags) {
-        updateData.tags = Array.isArray(website.tags) ? website.tags : [website.tags];
+        // If it's an array, convert to comma-separated string
+        if (Array.isArray(website.tags)) {
+          updateData.tags = website.tags.join(', ');
+        } else {
+          // Already a string, use as-is
+          updateData.tags = website.tags;
+        }
       } else {
         updateData.tags = null;
       }
@@ -150,6 +241,12 @@ export default function PersonalWebsiteDetail() {
       if (website.location !== undefined) updateData.location = website.location || null;
       if (website.notes !== undefined) updateData.notes = website.notes || null;
       if (website.active !== undefined) updateData.active = Boolean(website.active);
+      
+      // Include widget settings
+      if (website.widget_position !== undefined) updateData.widget_position = website.widget_position;
+      if (website.primary_color !== undefined) updateData.primary_color = website.primary_color;
+      if (website.enabled_profiles !== undefined) updateData.enabled_profiles = website.enabled_profiles;
+      if (website.enabled_features !== undefined) updateData.enabled_features = website.enabled_features;
       
       console.log("Update payload:", updateData);
       
@@ -173,7 +270,7 @@ export default function PersonalWebsiteDetail() {
       toast.error("Save failed: " + err.message);
     }
     setSaving(false);
-  }, [website, id]);
+  }, [website, id, availableTags, getCurrentTags]);
 
   const handleDelete = useCallback(async () => {
     const { error } = await supabase
@@ -205,8 +302,8 @@ export default function PersonalWebsiteDetail() {
   }, [website, id, update]);
 
   const embedCode = useMemo(
-    () => generateEmbedCode(website?.domain),
-    [website?.domain]
+    () => generateEmbedCode(website?.domain, cdnDomain),
+    [website?.domain, cdnDomain]
   );
 
   if (loading || !website) {
@@ -218,42 +315,56 @@ export default function PersonalWebsiteDetail() {
     );
   }
 
-  // Helper to get current tags array
-  const getCurrentTags = () => {
-    if (!website.tags) return [];
-    if (Array.isArray(website.tags)) return website.tags;
-    if (typeof website.tags === 'string') {
-      return website.tags.split(',').map(t => t.trim()).filter(Boolean);
-    }
-    return [];
-  };
-
   // Helper to add a tag
   const addTag = async (tag) => {
     const current = getCurrentTags();
-    if (!current.includes(tag)) {
-      // Store as array for database
-      const newTagsArray = [...current, tag];
-      update({ tags: newTagsArray });
+    // Case-insensitive check for duplicates
+    const tagLower = tag.toLowerCase();
+    const tagExists = current.some(t => t.toLowerCase() === tagLower);
+    
+    if (tagExists) {
+      toast.error(`Tag "${tag}" is already assigned`);
+      return;
+    }
+    
+    // Store as array for database
+    const newTagsArray = [...current, tag];
+    update({ tags: newTagsArray });
+    
+    // If this is a new tag not in Tag Manager, add it
+    const tagNotInManager = !availableTags.some(t => t.toLowerCase() === tagLower);
+    if (tagNotInManager) {
+      const newTags = [...availableTags, tag].sort();
+      setAvailableTags(newTags);
       
-      // If this is a new tag not in Tag Manager, add it
-      if (!availableTags.includes(tag)) {
-        const newTags = [...availableTags, tag].sort();
-        setAvailableTags(newTags);
+      // Save to Tag Manager (settings) - store as comma-separated string
+      try {
+        // Try update first, then insert if not exists
+        const { error: updateError } = await supabase
+          .from("settings")
+          .update({ 
+            value: newTags.join(", "),
+            updated_at: new Date().toISOString() 
+          })
+          .eq("key", "tags");
         
-        // Save to Tag Manager (settings) - store as comma-separated string
-        try {
-          await supabase
+        if (updateError) {
+          console.log("Update failed, trying insert:", updateError);
+          // If update fails, try insert
+          const { error: insertError } = await supabase
             .from("settings")
-            .upsert({ 
+            .insert({ 
               key: "tags", 
               value: newTags.join(", "),
               updated_at: new Date().toISOString() 
             });
-          console.log("Added new tag to Tag Manager:", tag);
-        } catch (e) {
-          console.error("Failed to save tag to Tag Manager:", e);
+          if (insertError) {
+            console.error("Insert also failed:", insertError);
+          }
         }
+        console.log("Added new tag to Tag Manager:", tag);
+      } catch (e) {
+        console.error("Failed to save tag to Tag Manager:", e);
       }
     }
   };
@@ -321,7 +432,31 @@ export default function PersonalWebsiteDetail() {
                 Stored cleanly on save (no https://, www., or trailing /).
               </p>
             </Field>
-            
+
+            {/* Contact Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Contact Name">
+                <Input
+                  value={website.contact_name || ''}
+                  onChange={(e) => update({ contact_name: e.target.value })}
+                  placeholder="John Doe"
+                  className="bg-[#0f1117] border-[#2e3245] text-white focus-visible:ring-[#007bff] focus-visible:border-transparent"
+                />
+              </Field>
+              <Field label="Contact Email">
+                <Input
+                  type="email"
+                  value={website.contact_email || ''}
+                  onChange={(e) => update({ contact_email: e.target.value })}
+                  placeholder="john@example.com"
+                  className="bg-[#0f1117] border-[#2e3245] text-white focus-visible:ring-[#007bff] focus-visible:border-transparent"
+                />
+                <p className="text-xs text-[#64748b] mt-1.5">
+                  Used for scan reports and widget delivery.
+                </p>
+              </Field>
+            </div>
+
             {/* Tags Field */}
             <Field label="Tags">
               {/* Current tags display */}
@@ -361,11 +496,14 @@ export default function PersonalWebsiteDetail() {
                 </SelectTrigger>
                 <SelectContent className="bg-[#1e2130] border-[#2e3245] max-h-[300px]">
                   <SelectItem value="__placeholder__" disabled>Select a tag...</SelectItem>
-                  {availableTags.map((tag) => (
-                    <SelectItem key={tag} value={tag}>
-                      {getCurrentTags().includes(tag) ? `✓ ${tag} (already assigned)` : tag}
-                    </SelectItem>
-                  ))}
+                  {availableTags.map((tag) => {
+                    const isAssigned = getCurrentTags().some(t => t.toLowerCase() === tag.toLowerCase());
+                    return (
+                      <SelectItem key={tag} value={tag}>
+                        {isAssigned ? `✓ ${tag} (already assigned)` : tag}
+                      </SelectItem>
+                    );
+                  })}
                   {availableTags.length === 0 && (
                     <SelectItem value="__empty__" disabled>No tags in Tag Manager</SelectItem>
                   )}
@@ -431,7 +569,9 @@ export default function PersonalWebsiteDetail() {
                   </SelectTrigger>
                   <SelectContent className="bg-[#1e2130] border-[#2e3245] text-white">
                     <SelectItem value="basic">Basic</SelectItem>
+                    <SelectItem value="starter">Starter</SelectItem>
                     <SelectItem value="pro">Pro</SelectItem>
+                    <SelectItem value="growth">Growth</SelectItem>
                     <SelectItem value="enterprise">Enterprise</SelectItem>
                   </SelectContent>
                 </Select>
