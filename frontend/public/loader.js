@@ -5,7 +5,7 @@
 
   /* ── CONFIG ────────────────────────────────────────────────────────────── */
   const SUPABASE_URL     = "https://fmwnswiwhgiofagqbkws.supabase.co";
-  const SUPABASE_ANON    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtd25zd2l3aGdpb2ZhZ3Fia3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MzYwMDcsImV4cCI6MjA5NDExMjAwN30.ZlhvVGjfisF8P7tLCzCheHhgKwJjBT3S9E5gALv8ugU";
+  const SUPABASE_ANON    = window.__ADASWIFT_SUPABASE_KEY || "YOUR_SUPABASE_ANON_KEY_HERE";
   const CURRENT_DOMAIN   = (document.currentScript && document.currentScript.getAttribute("data-domain"))
                            || window.location.hostname.replace(/^www\./, "");
   

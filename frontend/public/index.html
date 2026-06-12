@@ -21,6 +21,10 @@
         <title>ADASwift - ADA Compliance Widget Platform</title>
         <link rel="icon" type="image/png" href="/favicon.png" />
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
+        <script>
+            // Inject Supabase key from environment variable
+            window.__ADASWIFT_SUPABASE_KEY = "%REACT_APP_SUPABASE_ANON_KEY%";
+        </script>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run ADASwift.</noscript>
